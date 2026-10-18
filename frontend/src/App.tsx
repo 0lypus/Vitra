@@ -559,6 +559,19 @@ export default function App() {
       refrescarEspacio();
     } catch {
       setAviso("No se pudo quitar la canción.");
+      return;
+    }
+    // Quita el id de las listas que lo tuvieran, para no dejar números sueltos
+    const afectadas = listas
+      .filter((l) => l.pistas.includes(p.id))
+      .map((l) => ({ ...l, pistas: l.pistas.filter((x) => x !== p.id) }));
+    if (afectadas.length > 0) {
+      try {
+        for (const l of afectadas) await guardarLista(l);
+        setListas((prev) => prev.map((x) => afectadas.find((a) => a.id === x.id) ?? x));
+      } catch {
+        setAviso("La canción se quitó, pero no pude actualizar una lista.");
+      }
     }
   }
 
