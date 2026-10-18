@@ -24,6 +24,8 @@ Levanta en `http://localhost:5041` (el puerto está en `Properties/launchSetting
 | PUT | `/api/listas` | Upsert de una lista por nombre |
 | DELETE | `/api/listas/{nombre}` | Baja una lista por nombre |
 
+Las marcas `actualizado` se guardan como texto ISO UTC (`yyyy-MM-ddTHH:mm:ss.fffZ`, el mismo formato que `Date.toISOString()`). Al normalizarlas así, comparar dos marcas como texto da el mismo resultado que comparar los tiempos, y el ida y vuelta no pierde milisegundos ni la `Z`.
+
 ## Seguridad (por ahora)
 
 - **Sin autenticación**: pensado para red local o servidor propio detrás de tu propio proxy. No la expongas a internet tal cual.
@@ -31,6 +33,7 @@ Levanta en `http://localhost:5041` (el puerto está en `Properties/launchSetting
 
 ## Pendiente para la v2
 
-- [ ] Botón de sincronizar en el frontend (subir cambios / bajar lo del servidor)
+- [x] Botón de sincronizar en el frontend (subir cambios / bajar lo del servidor)
+- [ ] Propagar los borrados (hoy el sync solo sube y baja altas y cambios)
 - [ ] Autenticación simple (clave por usuario)
 - [ ] Migraciones de EF Core en vez de `EnsureCreated`

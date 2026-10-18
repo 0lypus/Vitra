@@ -15,7 +15,9 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Biblioteca local**: importá MP3, M4A, AAC, OGG, OPUS, WAV, FLAC, WEBM y MP4. Los archivos se guardan en IndexedDB junto con sus metadatos y carátulas (comprimidas a 256 px).
 - **Fondo dinámico**: el color dominante de la carátula tiñe el fondo con una transición suave.
 - **Letras sincronizadas (.lrc)**: parser propio; resalta la línea actual, se auto-centra y podés saltar haciendo clic en cualquier línea.
-- **Favoritos y listas de reproducción**: corazón en cada canción, chips de filtro y listas propias (crear, eliminar, agregar o quitar canciones).
+- **Favoritos y listas de reproducción**: corazón en cada canción, chips de filtro y listas propias (crear, renombrar, eliminar, agregar o quitar canciones y reordenarlas con ↑/↓).
+- **Editar metadatos**: título, artista y álbum a mano (solo dentro de Vitra; el archivo no se toca).
+- **Sincronización opcional (v2)**: con el backend propio (`backend/Vitra.Api`) podés subir y bajar metadatos, favoritos, letras y listas para tener la misma biblioteca en varios dispositivos. El audio no se sube.
 - **Aleatorio y repetir** (todas / una), recordados entre sesiones.
 - **Buscador** por título o artista, sin importar mayúsculas ni tildes.
 - **Visualizador de audio** con Web Audio API (espectro de 128 barras a 30 fps), encendible/apagable.
@@ -32,6 +34,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 2. **Letras**: guardá un archivo `.lrc` con el mismo nombre que el audio (por ejemplo `cancion.mp3` + `cancion.lrc`) y agregalos juntos, o soltá el `.lrc` sobre la ventana para aplicarlo a una canción ya importada.
 3. **Listas**: el botón `+` de cada fila abre el diálogo para agregar o quitar la canción de una lista (y crear listas desde ahí). Los chips arriba de la biblioteca filtran por “Todas”, “Favoritas” o cada lista.
 4. **Reproducción**: clic en cualquier canción; la navegación (anterior/siguiente) recorre lo que esté filtrado en ese momento.
+5. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen.
 
 ## Desarrollo
 
@@ -51,11 +54,23 @@ Estructura:
 frontend/src/
   App.tsx        # interfaz y lógica del reproductor
   biblioteca.ts  # IndexedDB: pistas, archivos, listas, favoritos
-  letras.ts      # parser de letras .lrc
+  letras.ts      # parser y serializador de letras .lrc
+  sinc.ts        # cliente del backend (subir y bajar cambios)
+  utilidades.ts  # formato de tiempo, tamaños y normalización de texto
   index.css      # estilos (vidrio, tema oscuro)
 frontend/public/demo/  # canción de ejemplo CC0 y su letra
+backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
 docs/logo.png
 ```
+
+El backend es opcional: Vitra funciona entero sin él. Para levantarlo:
+
+```powershell
+cd backend/Vitra.Api
+dotnet run       # API en http://localhost:5041
+```
+
+Detalles de los endpoints en `backend/README.md`.
 
 ## Restricciones conocidas
 
@@ -70,9 +85,13 @@ docs/logo.png
 ## Roadmap
 
 - [ ] Repetir ordenado (colas) y favoritos con carátula destacada
-- [ ] Edición de metadatos y renombrado de listas
-- [ ] Tests unitarios (parser `.lrc`, utilidades)
-- [ ] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
+- [x] Edición de metadatos y renombrado de listas
+- [x] Tests unitarios (parser `.lrc`, utilidades, sincronización)
+- [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
+- [ ] Propagar borrados al sincronizar (hoy solo se suben y bajan cambios)
+- [ ] Autenticación con clave para el backend (hoy es solo para red local)
+- [ ] Migraciones de EF Core en vez de `EnsureCreated`
+- [ ] Exportar e importar la biblioteca en JSON
 
 ## Licencia
 
