@@ -237,3 +237,126 @@ body {
   height: 1rem;
   fill: currentColor;
 }
+
+
+
+/* Tarjeta de reproducción con carátula */
+.now-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cover {
+  flex: none;
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mini {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sin-caratula {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.sin-caratula svg {
+  width: 45%;
+  height: 45%;
+  fill: currentColor;
+}
+
+.info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.now .info h2 {
+  margin: 0 0 0.15rem;
+}
+
+/* Lista de canciones */
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.list li:last-child {
+  border-bottom: none;
+}
+
+.track {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
+.titulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artista {
+  overflow: hidden;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dur {
+  flex: none;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.track.on .artista,
+.track.on .dur {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.btn-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.btn-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.btn-icon:hover {
+  color: var(--text);
+}
+
+.pie {
+  margin: 0;
+  text-align: center;
+}
+
+.aviso {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.95rem;
+  font-size: 0.9rem;
+  color: var(--gold);
+  background: rgba(255, 184, 107, 0.12);
+  border-radius: 12px;
+}

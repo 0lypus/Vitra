@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-
-type Pista = { id: number; nombre: string; archivo: File };
-
-const sinExtension = (nombre: string) => nombre.replace(/\.[^/.]+$/, "");
+import {
+  eliminarPista,
+  espacioUsado,
+  guardarPista,
+  leerMetadatos,
+  listarPistas,
+  obtenerArchivo,
+  pedirAlmacenamientoPersistente,
+  type Pista,
+} from "./biblioteca";
 
 function formato(seg: number) {
   if (!Number.isFinite(seg)) return "0:00";
   const m = Math.floor(seg / 60);
   const s = Math.floor(seg % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
+}
+
+function formatoTamano(bytes: number) {
+  const mb = bytes / 1024 / 1024;
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }
 
 function volumenInicial() {
@@ -63,37 +74,93 @@ const IcSilencio = () => (
     <path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </Icono>
 );
-const IcEcualizador = () => (
+const IcNota = () => (
   <Icono>
-    <rect x="4" y="10" width="4" height="10" rx="1" />
-    <rect x="10" y="4" width="4" height="16" rx="1" />
-    <rect x="16" y="8" width="4" height="12" rx="1" />
+    <path d="M9 17.5V5l11-2v12.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    <circle cx="6.5" cy="17.5" r="3" />
+    <circle cx="17.5" cy="15.5" r="3" />
+  </Icono>
+);
+const IcBasura = () => (
+  <Icono>
+    <path d="M9 4h6l1 2h4v2H4V6h4l1-2z" />
+    <path d="M6 9h12l-1 11H7L6 9z" />
   </Icono>
 );
 
+/* Muestra una carátula; crea la URL al montarse y la libera al desmontarse */
+function Caratula({ blob, className }: { blob?: Blob; className: string }) {
+  const [url, setUrl] = useState<string>();
+
+  useEffect(() => {
+    if (!blob) {
+      setUrl(undefined);
+      return;
+    }
+    const nueva = URL.createObjectURL(blob);
+    setUrl(nueva);
+    return () => URL.revokeObjectURL(nueva);
+  }, [blob]);
+
+  if (!url) {
+    return (
+      <div className={`${className} sin-caratula`}>
+        <IcNota />
+      </div>
+    );
+  }
+  return <img className={className} src={url} alt="" loading="lazy" />;
+}
+
 export default function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const siguienteId = useRef(1);
   const [pistas, setPistas] = useState<Pista[]>([]);
-  const [actual, setActual] = useState(-1);
+  const [cargando, setCargando] = useState(true);
+  const [actualId, setActualId] = useState<number | null>(null);
   const [sonando, setSonando] = useState(false);
   const [tiempo, setTiempo] = useState(0);
   const [duracion, setDuracion] = useState(0);
   const [volumen, setVolumen] = useState(volumenInicial);
   const [silenciado, setSilenciado] = useState(false);
+  const [procesando, setProcesando] = useState<{ hechas: number; total: number } | null>(null);
+  const [aviso, setAviso] = useState("");
+  const [espacio, setEspacio] = useState<number | null>(null);
 
-  const pista = pistas[actual];
-  const archivo = pista?.archivo;
+  const indice = pistas.findIndex((p) => p.id === actualId);
+  const pista = indice >= 0 ? pistas[indice] : undefined;
 
-  // Crea la URL solo de la pista actual y la libera al cambiar (ahorra memoria)
+  const refrescarEspacio = () => {
+    espacioUsado().then(setEspacio);
+  };
+
+  // Carga la biblioteca guardada (solo los datos de cada tema, no los archivos)
+  useEffect(() => {
+    listarPistas()
+      .then(setPistas)
+      .catch(() => setAviso("No se pudo abrir el almacenamiento del navegador."))
+      .finally(() => setCargando(false));
+    refrescarEspacio();
+  }, []);
+
+  // Lee el archivo de la pista actual y libera la URL anterior (ahorra memoria)
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !archivo) return;
-    const url = URL.createObjectURL(archivo);
-    audio.src = url;
-    audio.play().catch(() => {});
-    return () => URL.revokeObjectURL(url);
-  }, [archivo]);
+    if (!audio || actualId === null) return;
+    let cancelado = false;
+    let url: string | undefined;
+
+    obtenerArchivo(actualId).then((archivo) => {
+      if (cancelado || !archivo) return;
+      url = URL.createObjectURL(archivo);
+      audio.src = url;
+      audio.play().catch(() => {});
+    });
+
+    return () => {
+      cancelado = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [actualId]);
 
   // Aplica el volumen y lo recuerda para la próxima vez
   useEffect(() => {
@@ -109,35 +176,87 @@ export default function App() {
     }
   }, [volumen, silenciado]);
 
-  function agregar(e: ChangeEvent<HTMLInputElement>) {
-    const nuevas = Array.from(e.target.files ?? []).map((f) => ({
-      id: siguienteId.current++,
-      nombre: sinExtension(f.name),
-      archivo: f,
-    }));
+  async function agregar(e: ChangeEvent<HTMLInputElement>) {
+    const archivos = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (nuevas.length === 0) return;
-    setPistas((prev) => [...prev, ...nuevas]);
-    if (actual === -1) setActual(0);
+    if (archivos.length === 0) return;
+
+    setAviso("");
+    setProcesando({ hechas: 0, total: archivos.length });
+    const claves = new Set(pistas.map((p) => `${p.nombreArchivo}|${p.tamano}`));
+    let fallidas = 0;
+
+    for (const [i, archivo] of archivos.entries()) {
+      const clave = `${archivo.name}|${archivo.size}`;
+      if (!claves.has(clave)) {
+        claves.add(clave);
+        try {
+          const nueva = await leerMetadatos(archivo);
+          const guardada = await guardarPista(nueva, archivo);
+          setPistas((prev) => [...prev, guardada]);
+        } catch {
+          fallidas++;
+        }
+      }
+      setProcesando({ hechas: i + 1, total: archivos.length });
+    }
+
+    setProcesando(null);
+    if (fallidas > 0) setAviso(`No se pudieron guardar ${fallidas} archivo(s). ¿Falta espacio?`);
+    pedirAlmacenamientoPersistente();
+    refrescarEspacio();
+  }
+
+  async function quitar(p: Pista) {
+    if (p.id === actualId) {
+      const audio = audioRef.current;
+      audio?.pause();
+      audio?.removeAttribute("src");
+      audio?.load();
+      setActualId(null);
+      setSonando(false);
+      setTiempo(0);
+      setDuracion(0);
+    }
+    try {
+      await eliminarPista(p.id);
+      setPistas((prev) => prev.filter((x) => x.id !== p.id));
+      refrescarEspacio();
+    } catch {
+      setAviso("No se pudo quitar la canción.");
+    }
   }
 
   function alternar() {
     const audio = audioRef.current;
-    if (!audio || !archivo) return;
+    if (!audio || !pista) return;
     if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
   }
 
   function siguiente() {
+    const audio = audioRef.current;
     if (pistas.length === 0) return;
-    setActual((i) => (i + 1) % pistas.length);
+    if (pistas.length === 1) {
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+      return;
+    }
+    const i = indice >= 0 ? (indice + 1) % pistas.length : 0;
+    setActualId(pistas[i].id);
   }
 
   function anterior() {
     const audio = audioRef.current;
     if (pistas.length === 0 || !audio) return;
-    if (audio.currentTime > 3) audio.currentTime = 0;
-    else setActual((i) => (i - 1 + pistas.length) % pistas.length);
+    if (audio.currentTime > 3 || pistas.length === 1) {
+      audio.currentTime = 0;
+      return;
+    }
+    const i = indice >= 0 ? (indice - 1 + pistas.length) % pistas.length : 0;
+    setActualId(pistas[i].id);
   }
 
   function buscar(e: ChangeEvent<HTMLInputElement>) {
@@ -171,8 +290,15 @@ export default function App() {
       </header>
 
       <section className="glass now">
-        <h2>{pista ? pista.nombre : "Nada sonando"}</h2>
-        <p className="muted">{pista ? `Pista ${actual + 1} de ${pistas.length}` : "Agregá música para empezar"}</p>
+        <div className="now-top">
+          <Caratula blob={pista?.caratula} className="cover" />
+          <div className="info">
+            <h2>{pista ? pista.titulo : "Nada sonando"}</h2>
+            <p className="muted">
+              {pista ? pista.artista : pistas.length > 0 ? "Elegí una canción de tu biblioteca" : "Agregá música para empezar"}
+            </p>
+          </div>
+        </div>
 
         <div className="seek">
           <span>{formato(tiempo)}</span>
@@ -218,26 +344,44 @@ export default function App() {
       </section>
 
       <label className="add glass" style={{ padding: "0.85rem" }}>
-        + Agregar música
-        <input type="file" accept="audio/*" multiple onChange={agregar} />
+        {procesando ? `Procesando ${procesando.hechas} de ${procesando.total}...` : "+ Agregar música"}
+        <input type="file" accept="audio/*" multiple onChange={agregar} disabled={!!procesando} />
       </label>
 
+      {aviso && <p className="aviso">{aviso}</p>}
+
       <section className="glass">
-        {pistas.length === 0 ? (
-          <p className="empty">Todavía no hay canciones.</p>
+        {cargando ? (
+          <p className="empty">Cargando biblioteca...</p>
+        ) : pistas.length === 0 ? (
+          <p className="empty">Todavía no hay canciones. Agregá archivos de audio de tu dispositivo.</p>
         ) : (
           <ul className="list">
-            {pistas.map((p, i) => (
+            {pistas.map((p) => (
               <li key={p.id}>
-                <button className={`track ${i === actual ? "on" : ""}`} onClick={() => setActual(i)}>
-                  <span className="num">{i === actual ? <IcEcualizador /> : i + 1}</span>
-                  <span>{p.nombre}</span>
+                <button className={`track ${p.id === actualId ? "on" : ""}`} onClick={() => setActualId(p.id)}>
+                  <Caratula blob={p.caratula} className="mini" />
+                  <span className="info">
+                    <span className="titulo">{p.titulo}</span>
+                    <span className="artista">{p.artista}</span>
+                  </span>
+                  {p.duracion > 0 && <span className="dur">{formato(p.duracion)}</span>}
+                </button>
+                <button className="btn-icon" onClick={() => quitar(p)} aria-label={`Quitar ${p.titulo}`} title="Quitar de Vitra">
+                  <IcBasura />
                 </button>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {pistas.length > 0 && (
+        <p className="muted pie">
+          {pistas.length} {pistas.length === 1 ? "canción" : "canciones"}
+          {espacio !== null && ` · ${formatoTamano(espacio)} usados`}
+        </p>
+      )}
 
       <audio
         ref={audioRef}
