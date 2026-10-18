@@ -19,18 +19,7 @@ import {
   type Pista,
 } from "./biblioteca";
 import { parsearLrc, type LineaLetra } from "./letras";
-
-function formato(seg: number) {
-  if (!Number.isFinite(seg)) return "0:00";
-  const m = Math.floor(seg / 60);
-  const s = Math.floor(seg % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
-}
-
-function formatoTamano(bytes: number) {
-  const mb = bytes / 1024 / 1024;
-  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
-}
+import { formato, formatoTamano, normalizar } from "./utilidades";
 
 /* Altura fija (px) de cada fila de la biblioteca: permite virtualizar la lista */
 const ALTO_FILA = 64;
@@ -73,14 +62,6 @@ function verVisualizadorInicial() {
     /* sin acceso al almacenamiento */
   }
   return false;
-}
-
-/* Quita tildes y pasa a minúsculas, para buscar sin importar mayúsculas ni acentos */
-function normalizar(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 }
 
 /* Íconos SVG: se ven igual en todos los dispositivos */
