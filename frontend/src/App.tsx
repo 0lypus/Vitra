@@ -65,6 +65,15 @@ function repetirInicial(): Repetir {
   return "nada";
 }
 
+function verVisualizadorInicial() {
+  try {
+    return localStorage.getItem("vitra:visualizador") === "1";
+  } catch {
+    /* sin acceso al almacenamiento */
+  }
+  return false;
+}
+
 /* Quita tildes y pasa a minúsculas, para buscar sin importar mayúsculas ni acentos */
 function normalizar(s: string) {
   return s
@@ -144,6 +153,18 @@ const IcMas = () => (
     <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
   </Icono>
 );
+const IcOndas = () => (
+  <Icono>
+    <path
+      d="M3 12h2.5l2-6 3 12 2.5-9 2 5H21"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Icono>
+);
 const IcAleatorio = () => (
   <Icono>
     <path d="M16 3h5v5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -216,6 +237,7 @@ export default function App() {
   const [espacio, setEspacio] = useState<number | null>(null);
   const [aleatorio, setAleatorio] = useState(aleatorioInicial);
   const [repetir, setRepetir] = useState<Repetir>(repetirInicial);
+  const [verVisualizador, setVerVisualizador] = useState(verVisualizadorInicial);
   const [busqueda, setBusqueda] = useState("");
   const [soloFavoritas, setSoloFavoritas] = useState(false);
   const [listas, setListas] = useState<Lista[]>([]);
@@ -224,8 +246,11 @@ export default function App() {
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
   const listaRef = useRef<HTMLUListElement>(null); // contenedor scrolleable de la biblioteca
+  const canvasRef = useRef<HTMLCanvasElement>(null); // canvas del visualizador
+  const ctxAudioRef = useRef<AudioContext | null>(null); // contexto de Web Audio (uno solo por elemento audio)
+  const analizadorRef = useRef<AnalyserNode | null>(null);
   const [scrollLista, setScrollLista] = useState(0);
-  const [altoLista, setAltoLista] = useState(0);
+  const [altoLista, setAltoLista] = useState(0); // altura visible del contenedor de la lista
 
   // La lista filtrada; la navegación (siguiente/anterior) recorre esta
   const textoBusqueda = normalizar(busqueda.trim());
@@ -347,15 +372,16 @@ export default function App() {
     }
   }, [volumen, silenciado]);
 
-  // Recuerda aleatorio y repetir para la próxima vez
+  // Recuerda aleatorio, repetir y visualizador para la próxima vez
   useEffect(() => {
     try {
       localStorage.setItem("vitra:aleatorio", aleatorio ? "1" : "0");
       localStorage.setItem("vitra:repetir", repetir);
+      localStorage.setItem("vitra:visualizador", verVisualizador ? "1" : "0");
     } catch {
       /* sin acceso al almacenamiento */
     }
-  }, [aleatorio, repetir]);
+  }, [aleatorio, repetir, verVisualizador]);
 
   // Media Session API: controles en bloqueo, notificaciones y teclas multimedia
   useEffect(() => {
@@ -609,12 +635,85 @@ export default function App() {
     return () => window.removeEventListener("keydown", tecla);
   }, [agregandoA]);
 
+  /* Conecta el audio al analizador de Web Audio.
+     Hay que llamarlo con un gesto del usuario: el contexto arranca suspendido. */
+  function prepararAnalizador() {
+    const audio = audioRef.current;
+    if (!audio || ctxAudioRef.current) {
+      void ctxAudioRef.current?.resume();
+      return;
+    }
+    try {
+      const Ctor: typeof AudioContext | undefined =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return;
+      const ctx = new Ctor();
+      const fuente = ctx.createMediaElementSource(audio);
+      const analizador = ctx.createAnalyser();
+      analizador.fftSize = 256; // 128 barras de frecuencia
+      analizador.smoothingTimeConstant = 0.82;
+      fuente.connect(analizador);
+      analizador.connect(ctx.destination); // sin esto el audio no se escucha
+      ctxAudioRef.current = ctx;
+      analizadorRef.current = analizador;
+      void ctx.resume();
+    } catch {
+      /* Web Audio no disponible */
+    }
+  }
+
   function alternar() {
     const audio = audioRef.current;
     if (!audio || !pista) return;
+    prepararAnalizador();
     if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
   }
+
+  // Visualizador: dibuja el espectro en el canvas a ~30 fps mientras esté encendido
+  useEffect(() => {
+    if (!verVisualizador) return;
+    const canvas = canvasRef.current;
+    const ctx2d = canvas?.getContext("2d");
+    if (!canvas || !ctx2d) return;
+
+    const ajustar = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    };
+    ajustar();
+    window.addEventListener("resize", ajustar);
+
+    const estilo = getComputedStyle(document.documentElement);
+    const grad = ctx2d.createLinearGradient(0, canvas.height, 0, 0);
+    grad.addColorStop(0, estilo.getPropertyValue("--accent").trim() || "#c4a8ff");
+    grad.addColorStop(1, estilo.getPropertyValue("--gold").trim() || "#ffb86b");
+
+    const datos = new Uint8Array(analizadorRef.current?.frequencyBinCount ?? 128);
+    let ultimo = 0;
+    let raf = 0;
+    const dibujar = (ahora: number) => {
+      raf = requestAnimationFrame(dibujar);
+      if (ahora - ultimo < 33) return; // ~30 fps: suficiente y barato
+      ultimo = ahora;
+      analizadorRef.current?.getByteFrequencyData(datos);
+      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+      ctx2d.fillStyle = grad;
+      const n = datos.length;
+      const ancho = canvas.width / n;
+      const hueco = Math.min(2 * (window.devicePixelRatio || 1), ancho * 0.35);
+      for (let i = 0; i < n; i++) {
+        const alto = Math.max(2, (datos[i] / 255) * canvas.height);
+        ctx2d.fillRect(i * ancho + hueco / 2, canvas.height - alto, ancho - hueco, alto);
+      }
+    };
+    raf = requestAnimationFrame(dibujar);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", ajustar);
+    };
+  }, [verVisualizador]);
 
   /* Mueve la reproducción delta segundos (atajos de teclado) */
   function saltar(delta: number) {
@@ -857,6 +956,18 @@ export default function App() {
           >
             {repetir === "una" ? <IcRepetirUna /> : <IcRepetir />}
           </button>
+          <button
+            className={`btn btn-mini ${verVisualizador ? "activo" : ""}`}
+            onClick={() => {
+              if (!verVisualizador) prepararAnalizador();
+              setVerVisualizador((v) => !v);
+            }}
+            aria-label="Visualizador de audio"
+            aria-pressed={verVisualizador}
+            title={verVisualizador ? "Ocultar visualizador" : "Mostrar visualizador"}
+          >
+            <IcOndas />
+          </button>
         </div>
 
         <div className="volume">
@@ -873,6 +984,8 @@ export default function App() {
             aria-label="Volumen"
           />
         </div>
+
+        {verVisualizador && <canvas ref={canvasRef} className="visualizador" aria-hidden="true" />}
       </section>
 
       {pista?.letra && pista.letra.length > 0 && (
@@ -1019,7 +1132,13 @@ export default function App() {
                 className={`fila${primero + k === pistasVisibles.length - 1 ? " sin-borde" : ""}`}
                 style={{ top: (primero + k) * ALTO_FILA }}
               >
-                <button className={`track ${p.id === actualId ? "on" : ""}`} onClick={() => setActualId(p.id)}>
+                <button
+                  className={`track ${p.id === actualId ? "on" : ""}`}
+                  onClick={() => {
+                    prepararAnalizador();
+                    setActualId(p.id);
+                  }}
+                >
                   <Caratula blob={p.caratula} className="mini" />
                   <span className="info">
                     <span className="titulo">{p.titulo}</span>

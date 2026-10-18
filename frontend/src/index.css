@@ -306,6 +306,16 @@ body {
   box-shadow: 0 0 14px rgba(255, 184, 107, 0.45);
 }
 
+/* Visualizador de audio */
+.visualizador {
+  display: block;
+  width: 100%;
+  height: 84px;
+  margin-top: 1rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
 /* Buscador de la biblioteca */
 .filtros {
   display: flex;
