@@ -31,10 +31,23 @@ var builderCors = builder.Services.AddCors(opciones =>
 
 var app = builder.Build();
 
-// Crea la base si no existe (la base es descartable: se regenera con un sync)
+/* Aplica las migraciones al arrancar: la base es descartable (se regenera con
+   un sync), así que no hace falta que la toques a mano. Si venís de una versión
+   que creaba la base de otra forma, borrá vitra.db una vez y listo. */
 using (var alcance = app.Services.CreateScope())
 {
-    alcance.ServiceProvider.GetRequiredService<VitraContext>().Database.EnsureCreated();
+    var baseDatos = alcance.ServiceProvider.GetRequiredService<VitraContext>().Database;
+    try
+    {
+        baseDatos.Migrate();
+    }
+    catch (Exception error)
+    {
+        alcance.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Vitra").LogError(
+            error,
+            "No se pudo preparar vitra.db. Si venís de una versión anterior de Vitra.Api, borrá el archivo (se regenera con el próximo sync) y volvé a arrancar.");
+        throw;
+    }
 }
 
 app.UseCors("frontend");
