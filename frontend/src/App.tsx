@@ -1288,20 +1288,27 @@ export default function App() {
           onClick={async () => {
             const archivosDemo = ["demo1.mp3", "demo2.mp3", "demo3.mp3"];
             const archivos: File[] = [];
-            for (const nombre of archivosDemo) {
+            /* Ojo: el servidor de la app contesta index.html con un 200 cuando el
+               archivo no existe, así que hay que mirar el tipo de contenido: si
+               vuelve HTML, ese demo no está y no se importa. */
+            const traer = async (ruta: string) => {
               try {
-                const res = await fetch(`/demo/${nombre}`);
-                if (res.ok) {
-                  const blob = await res.blob();
-                  archivos.push(new File([blob], nombre, { type: blob.type || "audio/mpeg" }));
-                }
-                // Trae también la letra .lrc si existe junto al archivo de ejemplo
-                const base = nombre.replace(/\.mp3$/i, "");
-                const resLrc = await fetch(`/demo/${base}.lrc`);
-                if (resLrc.ok) {
-                  archivos.push(new File([await resLrc.blob()], `${base}.lrc`, { type: "text/plain" }));
-                }
-              } catch {}
+                const res = await fetch(ruta);
+                if (!res.ok) return null;
+                if (/text\/html/i.test(res.headers.get("content-type") ?? "")) return null;
+                const blob = await res.blob();
+                return blob.size > 0 ? blob : null;
+              } catch {
+                return null;
+              }
+            };
+            for (const nombre of archivosDemo) {
+              const audio = await traer(`/demo/${nombre}`);
+              if (audio) archivos.push(new File([audio], nombre, { type: audio.type || "audio/mpeg" }));
+              // Trae también la letra .lrc si existe junto al archivo de ejemplo
+              const base = nombre.replace(/\.mp3$/i, "");
+              const letra = await traer(`/demo/${base}.lrc`);
+              if (letra) archivos.push(new File([letra], `${base}.lrc`, { type: "text/plain" }));
             }
             if (archivos.filter((a) => a.name.endsWith(".mp3")).length === 0) {
               setAviso("No se encontraron canciones de ejemplo en /demo/");
