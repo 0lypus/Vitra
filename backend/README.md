@@ -31,12 +31,18 @@ El cliente la escribe una vez en el diálogo **Sincronizar** y la manda en cada 
 |---|---|---|
 | GET | `/salud` | Comprobación de vida |
 | GET | `/api/sinc` | Devuelve todas las pistas y listas del servidor |
-| PUT | `/api/pistas` | Upsert de una pista (gana la versión más nueva por `actualizado`) |
-| DELETE | `/api/pistas/{clave}` | Baja una pista por clave |
-| PUT | `/api/listas` | Upsert de una lista por nombre |
-| DELETE | `/api/listas/{nombre}` | Baja una lista por nombre |
+| PUT | `/api/pistas` | Upsert de una pista (gana la versión más nueva por `actualizado`). Si viene con `borrado: true` deja la tumba |
+| DELETE | `/api/pistas/{clave}` | Deja la pista como tumba (`borrado: true` con la marca de ahora); no elimina la fila |
+| PUT | `/api/listas` | Upsert de una lista por nombre (acepta `borrado: true` igual que las pistas) |
+| DELETE | `/api/listas/{nombre}` | Deja la lista como tumba, igual que las pistas |
 
 Las marcas `actualizado` se guardan como texto ISO UTC (`yyyy-MM-ddTHH:mm:ss.fffZ`, el mismo formato que `Date.toISOString()`). Al normalizarlas así, comparar dos marcas como texto da el mismo resultado que comparar los tiempos, y el ida y vuelta no pierde milisegundos ni la `Z`.
+
+### Borrados
+
+Los borrados no se eliminan: quedan como **tumbas** (`borrado: true`) con su propia marca `actualizado`, y `/api/sinc` las devuelve junto con lo vivo. Así el otro dispositivo se entera y borra en casa, pero si alguien editó esa canción después, la edición más nueva gana y la canción vuelve a existir. Las tumbas no arrastran metadatos: un borrado subido desde el cliente no pisa el título/autor que ya estaba guardado, y el servidor tampoco descarta los datos que tenía.
+
+Para arrancar de una versión anterior (sin la columna `Borrado`), borrá `backend/Vitra.Api/vitra.db`: se regenera solo al arrancar. Todavía no hay migraciones de EF Core.
 
 ## Seguridad
 
@@ -57,5 +63,5 @@ Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético) y la
 
 - [x] Botón de sincronizar en el frontend (subir cambios / bajar lo del servidor)
 - [x] Clave de acceso opcional para `/api/*` (encabezado `X-Clave`)
-- [ ] Propagar los borrados (hoy el sync solo sube y baja altas y cambios)
+- [x] Propagar los borrados (tumbas con `borrado: true` que compiten por `actualizado`)
 - [ ] Migraciones de EF Core en vez de `EnsureCreated`
