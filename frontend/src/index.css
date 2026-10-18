@@ -179,29 +179,50 @@ body {
   font-weight: 600;
 }
 
+/* Lista de canciones (virtualizada: filas absolutas de altura fija) */
 .list {
+  position: relative;
+  max-height: 60vh;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
+  scrollbar-width: thin;
+}
+
+.renglon-total {
+  display: block;
+  border: none;
+}
+
+.fila {
+  position: absolute;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 64px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.fila.sin-borde {
+  border-bottom: none;
 }
 
 .track {
   display: flex;
   align-items: center;
+  flex: 1;
   gap: 0.7rem;
-  width: 100%;
-  padding: 0.7rem 0.4rem;
+  min-width: 0;
+  padding: 0.5rem 0.4rem;
   font: inherit;
   color: var(--text);
   text-align: left;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--glass-border);
   cursor: pointer;
-}
-
-.list li:last-child .track {
-  border-bottom: none;
 }
 
 .track.on {
@@ -597,23 +618,6 @@ body {
 }
 
 /* Lista de canciones */
-.list li {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.list li:last-child {
-  border-bottom: none;
-}
-
-.track {
-  flex: 1;
-  min-width: 0;
-  border-bottom: none;
-}
-
 .titulo {
   overflow: hidden;
   text-overflow: ellipsis;

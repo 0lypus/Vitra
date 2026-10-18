@@ -31,6 +31,9 @@ function formatoTamano(bytes: number) {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }
 
+/* Altura fija (px) de cada fila de la biblioteca: permite virtualizar la lista */
+const ALTO_FILA = 64;
+
 function volumenInicial() {
   try {
     const guardado = localStorage.getItem("vitra:volumen");
@@ -220,6 +223,9 @@ export default function App() {
   const [agregandoA, setAgregandoA] = useState<number | null>(null); // pista elegida en el diálogo "agregar a lista"
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
+  const listaRef = useRef<HTMLUListElement>(null); // contenedor scrolleable de la biblioteca
+  const [scrollLista, setScrollLista] = useState(0);
+  const [altoLista, setAltoLista] = useState(0);
 
   // La lista filtrada; la navegación (siguiente/anterior) recorre esta
   const textoBusqueda = normalizar(busqueda.trim());
@@ -235,6 +241,26 @@ export default function App() {
   const indice = pistasVisibles.findIndex((p) => p.id === actualId);
   const pista = pistas.find((p) => p.id === actualId);
   const favoritasCount = useMemo(() => pistas.filter((p) => p.favorito).length, [pistas]);
+
+  /* Virtualización: solo se pintan las filas que caben en pantalla (más un margen) */
+  useEffect(() => {
+    const medir = () => setAltoLista(listaRef.current?.clientHeight ?? 0);
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, [pistasVisibles.length]);
+
+  // Vuelve arriba al cambiar de vista (lista, favoritas o búsqueda)
+  useEffect(() => {
+    listaRef.current?.scrollTo({ top: 0 });
+    setScrollLista(0);
+  }, [listaActiva, soloFavoritas, busqueda]);
+
+  const primero = Math.min(
+    Math.max(0, Math.floor(scrollLista / ALTO_FILA) - 4),
+    Math.max(0, pistasVisibles.length - 1),
+  );
+  const ultimo = Math.min(pistasVisibles.length, Math.ceil((scrollLista + altoLista) / ALTO_FILA) + 4);
 
   /* Índice de la línea de la letra que corresponde al tiempo actual (búsqueda binaria) */
   const idxLetra = useMemo(() => {
@@ -985,9 +1011,14 @@ export default function App() {
                 : `No hay canciones que coincidan con “${busqueda}”.`}
           </p>
         ) : (
-          <ul className="list">
-            {pistasVisibles.map((p) => (
-              <li key={p.id}>
+          <ul className="list" ref={listaRef} onScroll={(e) => setScrollLista(e.currentTarget.scrollTop)}>
+            <li className="renglon-total" style={{ height: pistasVisibles.length * ALTO_FILA }} aria-hidden="true" />
+            {pistasVisibles.slice(primero, ultimo).map((p, k) => (
+              <li
+                key={p.id}
+                className={`fila${primero + k === pistasVisibles.length - 1 ? " sin-borde" : ""}`}
+                style={{ top: (primero + k) * ALTO_FILA }}
+              >
                 <button className={`track ${p.id === actualId ? "on" : ""}`} onClick={() => setActualId(p.id)}>
                   <Caratula blob={p.caratula} className="mini" />
                   <span className="info">
