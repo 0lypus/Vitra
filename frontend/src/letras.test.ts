@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsearLrc } from "./letras";
+import { parsearLrc, serializarLrc } from "./letras";
 
 describe("parsearLrc", () => {
   it("parsea marcas [mm:ss] y [mm:ss.x]", () => {
@@ -59,5 +59,26 @@ describe("parsearLrc", () => {
       { t: 1, texto: "a" },
       { t: 2, texto: "b" },
     ]);
+  });
+});
+
+describe("serializarLrc", () => {
+  it("genera marcas [mm:ss.xx] con dos dígitos de centésimas", () => {
+    expect(
+      serializarLrc([
+        { t: 1, texto: "a" },
+        { t: 62.5, texto: "b" },
+      ]),
+    ).toBe("[00:01.00]a\n[01:02.50]b");
+  });
+
+  it("ida y vuelta conserva líneas y tiempos", () => {
+    const lineas = [
+      { t: 0, texto: "inicio" },
+      { t: 10.5, texto: "con tilde: canción" },
+      { t: 72.25, texto: "" },
+      { t: 300, texto: "final" },
+    ];
+    expect(parsearLrc(serializarLrc(lineas))).toEqual(lineas);
   });
 });

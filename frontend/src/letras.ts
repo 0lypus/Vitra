@@ -27,3 +27,14 @@ export function parsearLrc(texto: string): LineaLetra[] {
   lineas.sort((a, b) => a.t - b.t);
   return lineas;
 }
+
+/* Convierte líneas parseadas de vuelta a texto .lrc (para subirlas al backend) */
+export function serializarLrc(lineas: LineaLetra[]): string {
+  return lineas
+    .map((l) => {
+      const m = Math.floor(l.t / 60);
+      const s = (l.t % 60).toFixed(2).padStart(5, "0");
+      return `[${String(m).padStart(2, "0")}:${s}]${l.texto}`;
+    })
+    .join("\n");
+}
