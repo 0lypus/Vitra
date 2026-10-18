@@ -13,6 +13,18 @@ dotnet run
 
 Levanta en `http://localhost:5041` (el puerto está en `Properties/launchSettings.json`; se puede cambiar con `dotnet run --urls http://localhost:5199`). Crea `vitra.db` (SQLite) automáticamente la primera vez.
 
+Para exigir clave de acceso, poné `"Vitra:Clave"` en `appsettings.json`, o pasala al arrancar sin tocar el archivo:
+
+```powershell
+# PowerShell
+$env:VITRA_CLAVE = "mi-clave-secreta"
+dotnet run
+# o directo en la línea de comandos:
+dotnet run -- --Vitra:Clave=mi-clave-secreta
+```
+
+El cliente la escribe una vez en el diálogo **Sincronizar** y la manda en cada pedido.
+
 ## Endpoints
 
 | Método | Ruta | Qué hace |
@@ -26,14 +38,24 @@ Levanta en `http://localhost:5041` (el puerto está en `Properties/launchSetting
 
 Las marcas `actualizado` se guardan como texto ISO UTC (`yyyy-MM-ddTHH:mm:ss.fffZ`, el mismo formato que `Date.toISOString()`). Al normalizarlas así, comparar dos marcas como texto da el mismo resultado que comparar los tiempos, y el ida y vuelta no pierde milisegundos ni la `Z`.
 
-## Seguridad (por ahora)
+## Seguridad
 
-- **Sin autenticación**: pensado para red local o servidor propio detrás de tu propio proxy. No la expongas a internet tal cual.
+- **Clave opcional**: con `Vitra:Clave` vacío la API queda **abierta** (sirve para red local). En cuanto le pongas una clave, todos los endpoints `/api/*` responden `401` salvo que manden el encabezado `X-Clave` con ese valor. El comparador es de tiempo constante y el encabezado está permitido en el CORS. `/salud` queda siempre abierto, para poder chequear que el servidor responde.
 - CORS permite solo `http://localhost:5173` (el dev server del frontend).
+- Aun con clave, sigue pensado para red local o servidor propio detrás de tu propio proxy: no lo expongas a internet tal cual.
 
-## Pendiente para la v2
+## Tests
+
+```powershell
+cd backend/Vitra.Api.Tests
+dotnet test
+```
+
+Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético) y la clave de acceso.
+
+## Pendientes
 
 - [x] Botón de sincronizar en el frontend (subir cambios / bajar lo del servidor)
+- [x] Clave de acceso opcional para `/api/*` (encabezado `X-Clave`)
 - [ ] Propagar los borrados (hoy el sync solo sube y baja altas y cambios)
-- [ ] Autenticación simple (clave por usuario)
 - [ ] Migraciones de EF Core en vez de `EnsureCreated`

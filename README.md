@@ -19,7 +19,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Cola de reproducción**: con el botón de cola de cada canción podés ponerla “a continuación” o al final. El chip “Cola” muestra lo encolado, que se puede reordenar, quitar o vaciar, y suena antes que el resto de la biblioteca.
 - **Editar metadatos**: título, artista y álbum a mano (solo dentro de Vitra; el archivo no se toca).
 - **Respaldo en JSON**: descargá un archivo con tus metadatos, favoritos, letras y listas, e importalo cuando quieras. Sirve para no perder nada si el navegador limpia los datos y para pasar tus datos a otro dispositivo.
-- **Sincronización opcional (v2)**: con el backend propio (`backend/Vitra.Api`) podés subir y bajar metadatos, favoritos, letras y listas para tener la misma biblioteca en varios dispositivos. El audio no se sube.
+- **Sincronización opcional (v2)**: con el backend propio (`backend/Vitra.Api`) podés subir y bajar metadatos, favoritos, letras y listas para tener la misma biblioteca en varios dispositivos. El audio no se sube. El servidor puede exigir clave de acceso (`X-Clave`); la escribes una vez en el diálogo y Vitra la recuerda.
 - **Aleatorio y repetir** (todas / una), recordados entre sesiones.
 - **Buscador** por título o artista, sin importar mayúsculas ni tildes.
 - **Visualizador de audio** con Web Audio API (espectro de 128 barras a 30 fps), encendible/apagable.
@@ -37,7 +37,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 3. **Listas**: el botón `+` de cada fila abre el diálogo para agregar o quitar la canción de una lista (y crear listas desde ahí). Los chips arriba de la biblioteca filtran por “Todas”, “Favoritas” o cada lista.
 4. **Reproducción**: clic en cualquier canción; la navegación (anterior/siguiente) recorre lo que esté filtrado en ese momento.
 5. **Cola**: el botón de cola de cada fila (el ▶ con rayitas) abre el diálogo para poner esa canción “a continuación” o “al final”. El chip “Cola” abre el panel, donde se reordena con ↑/↓, se quitan canciones o se vacía. Lo encolado suena antes que el orden normal (biblioteca, favoritas o lista activa); la cola es de la sesión: al cerrar la app se pierde.
-6. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen.
+6. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Podés poner una clave en el diálogo si el backend la exige. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen.
 7. **Respaldo**: “Respaldo” → “Descargar respaldo” baja un `.json` con esos mismos datos. Si algún día el navegador limpia el almacenamiento (o querés mudarte de equipo), agregá de nuevo los archivos de audio y tocá “Importar respaldo...”: se vuelven a aplicar favoritos, letras, títulos y listas sobre las canciones que coincidan por nombre y tamaño.
 
 ## Desarrollo
@@ -48,7 +48,14 @@ npm install
 npm run dev      # desarrollo con hot reload
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
-npm test         # tests (parser .lrc, utilidades, cola, sync y respaldo)
+npm test         # tests (parser .lrc, utilidades, cola, sync, respaldo y clave)
+```
+
+El backend tiene sus propios tests (xunit):
+
+```powershell
+cd backend/Vitra.Api.Tests
+dotnet test     # 21 tests (marcas de sincronización y clave de acceso)
 ```
 
 Stack: React + TypeScript + Vite, `idb` (IndexedDB), `music-metadata` y `vite-plugin-pwa`. Sin frameworks de UI: CSS a mano con variables y `backdrop-filter`. Los tests usan `vitest` y, para los que tocan IndexedDB, `fake-indexeddb` (solo dependencia de desarrollo).
@@ -67,6 +74,9 @@ frontend/src/
   index.css      # estilos (vidrio, tema oscuro)
 frontend/public/demo/  # canción de ejemplo CC0 y su letra
 backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
+  Clave.cs             # clave de acceso opcional (encabezado X-Clave)
+  Modelos.cs           # entidades y marcas de sincronización
+backend/Vitra.Api.Tests/  # tests de .NET (xunit)
 docs/logo.png
 ```
 
@@ -76,6 +86,8 @@ El backend es opcional: Vitra funciona entero sin él. Para levantarlo:
 cd backend/Vitra.Api
 dotnet run       # API en http://localhost:5041
 ```
+
+Arranca abierta; si le ponés una clave (`"Vitra:Clave"` en `appsettings.json`, `--Vitra:Clave=...` o la variable `VITRA_CLAVE`), los endpoints `/api/*` piden el encabezado `X-Clave`, que el diálogo de Sincronizar manda por vos.
 
 Detalles de los endpoints en `backend/README.md`.
 
@@ -97,7 +109,7 @@ Detalles de los endpoints en `backend/README.md`.
 - [x] Tests unitarios (parser `.lrc`, utilidades, cola, sincronización y respaldo)
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
 - [ ] Propagar borrados al sincronizar (hoy solo se suben y bajan cambios)
-- [ ] Autenticación con clave para el backend (hoy es solo para red local)
+- [x] Autenticación con clave para el backend (opcional, cabezal `X-Clave`); con `Vitra:Clave` vacío queda abierto para red local.
 - [ ] Migraciones de EF Core en vez de `EnsureCreated`
 - [x] Exportar e importar la biblioteca en JSON
 
