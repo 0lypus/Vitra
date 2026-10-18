@@ -1,0 +1,117 @@
+/* API de sincronización de Vitra (v2).
+
+   No guarda archivos de audio: solo metadatos, favoritos, letras y listas,
+   para poder restaurar la biblioteca en otro dispositivo. Las canciones se
+   emparejan por "nombreArchivo|tamano".
+
+   Uso pensado para una red local o un servidor propio. No implementa
+   autenticación todavía: no la expongas a internet. */
+
+using Microsoft.EntityFrameworkCore;
+using Vitra.Api;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<VitraContext>(opciones =>
+    opciones.UseSqlite($"Data Source={builder.Environment.ContentRootPath}/vitra.db"));
+
+var builderCors = builder.Services.AddCors(opciones =>
+    opciones.AddPolicy("frontend", p => p
+        .WithOrigins("http://localhost:5173", "https://localhost:5173")
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+
+var app = builder.Build();
+
+// Crea la base si no existe (la base es descartable: se regenera con un sync)
+using (var alcance = app.Services.CreateScope())
+{
+    alcance.ServiceProvider.GetRequiredService<VitraContext>().Database.EnsureCreated();
+}
+
+app.UseCors("frontend");
+
+/* Comprobación de vida */
+app.MapGet("/salud", () => Results.Ok(new { mensaje = "Vitra API arriba", hora = DateTime.UtcNow }));
+
+/* Devuelve todo lo que tiene el servidor (el cliente sube solo lo que falte o esté viejo) */
+app.MapGet("/api/sinc", async (VitraContext db) =>
+    Results.Ok(new
+    {
+        pistas = await db.Pistas.AsNoTracking().OrderBy(p => p.Clave).ToListAsync(),
+        listas = await db.Listas.AsNoTracking().OrderBy(l => l.Nombre).ToListAsync(),
+    }));
+
+/* Upsert de una pista: si la clave existe y el servidor está más viejo, reemplaza */
+app.MapPut("/api/pistas", async (PistaDto dto, VitraContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(dto.Clave)) return Results.BadRequest("Falta la clave.");
+
+    var existente = await db.Pistas.FirstOrDefaultAsync(p => p.Clave == dto.Clave);
+    if (existente is null)
+    {
+        db.Pistas.Add(new PistaSinc
+        {
+            Clave = dto.Clave,
+            Titulo = dto.Titulo,
+            Artista = dto.Artista,
+            Album = dto.Album,
+            Duracion = dto.Duracion,
+            Favorito = dto.Favorito,
+            Letra = dto.Letra,
+            Actualizado = dto.Actualizado,
+        });
+    }
+    else if (dto.Actualizado >= existente.Actualizado)
+    {
+        existente.Titulo = dto.Titulo;
+        existente.Artista = dto.Artista;
+        existente.Album = dto.Album;
+        existente.Duracion = dto.Duracion;
+        existente.Favorito = dto.Favorito;
+        existente.Letra = dto.Letra;
+        existente.Actualizado = dto.Actualizado;
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok();
+});
+
+/* Baja una pista por clave */
+app.MapDelete("/api/pistas/{clave}", async (string clave, VitraContext db) =>
+{
+    var filas = await db.Pistas.Where(p => p.Clave == clave).ExecuteDeleteAsync();
+    return filas > 0 ? Results.Ok() : Results.NotFound();
+});
+
+/* Upsert de una lista por nombre */
+app.MapPut("/api/listas", async (ListaDto dto, VitraContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(dto.Nombre)) return Results.BadRequest("Falta el nombre.");
+
+    var existente = await db.Listas.FirstOrDefaultAsync(l => l.Nombre == dto.Nombre);
+    if (existente is null)
+    {
+        db.Listas.Add(new ListaSinc
+        {
+            Nombre = dto.Nombre.Trim(),
+            Pistas = dto.Pistas,
+            Actualizado = dto.Actualizado,
+        });
+    }
+    else if (dto.Actualizado >= existente.Actualizado)
+    {
+        existente.Pistas = dto.Pistas;
+        existente.Actualizado = dto.Actualizado;
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok();
+});
+
+/* Baja una lista por nombre */
+app.MapDelete("/api/listas/{nombre}", async (string nombre, VitraContext db) =>
+{
+    var filas = await db.Listas.Where(l => l.Nombre == nombre).ExecuteDeleteAsync();
+    return filas > 0 ? Results.Ok() : Results.NotFound();
+});
+
+app.Run();
