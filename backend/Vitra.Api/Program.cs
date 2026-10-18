@@ -4,13 +4,21 @@
    para poder restaurar la biblioteca en otro dispositivo. Las canciones se
    emparejan por "nombreArchivo|tamano".
 
-   Uso pensado para una red local o un servidor propio. No implementa
-   autenticación todavía: no la expongas a internet. */
+   Uso pensado para una red local o un servidor propio. La clave de acceso es
+   opcional: si no configurás ninguna, la API queda abierta (no la expongas a
+   internet así). Para exigirla, definí "Vitra:Clave" en appsettings.json o la
+   variable de entorno VITRA_CLAVE. */
 
 using Microsoft.EntityFrameworkCore;
 using Vitra.Api;
 
 var builder = WebApplication.CreateBuilder(args);
+
+/* Clave de acceso opcional: vacía = API abierta (para red local).
+   Sale de appsettings.json ("Vitra:Clave"), de --Vitra:Clave=... o, si ahí no
+   hay nada, de la variable de entorno VITRA_CLAVE. */
+var claveApi = (builder.Configuration["Vitra:Clave"] ?? "").Trim();
+if (claveApi.Length == 0) claveApi = (Environment.GetEnvironmentVariable("VITRA_CLAVE") ?? "").Trim();
 
 builder.Services.AddDbContext<VitraContext>(opciones =>
     opciones.UseSqlite($"Data Source={builder.Environment.ContentRootPath}/vitra.db"));
@@ -30,6 +38,27 @@ using (var alcance = app.Services.CreateScope())
 }
 
 app.UseCors("frontend");
+
+/* Con clave configurada, los endpoints /api/* piden el encabezado X-Clave */
+if (claveApi.Length > 0)
+{
+    app.Use(async (contexto, siguiente) =>
+    {
+        if (contexto.Request.Path.StartsWithSegments("/api") && !Clave.EsValida(claveApi, contexto.Request.Headers[Clave.Encabezado]))
+        {
+            contexto.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await contexto.Response.WriteAsJsonAsync(new { error = $"Falta la clave o es incorrecta (encabezado {Clave.Encabezado})." });
+            return;
+        }
+        await siguiente();
+    });
+    app.Logger.LogInformation("Vitra API: clave de acceso activada (encabezado {Encabezado}).", Clave.Encabezado);
+}
+else
+{
+    app.Logger.LogWarning(
+        "Vitra API: no hay clave configurada, así que la API queda abierta. Definí \"Vitra:Clave\" en appsettings.json o la variable de entorno VITRA_CLAVE para protegerla.");
+}
 
 /* Comprobación de vida */
 app.MapGet("/salud", () => Results.Ok(new { mensaje = "Vitra API arriba", hora = DateTime.UtcNow }));
