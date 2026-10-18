@@ -814,6 +814,9 @@ export default function App() {
         r.listasSubidas > 0 && `${r.listasSubidas} ${r.listasSubidas === 1 ? "lista subida" : "listas subidas"}`,
         r.listasActualizadas > 0 &&
           `${r.listasActualizadas} ${r.listasActualizadas === 1 ? "lista actualizada" : "listas actualizadas"}`,
+        r.borradosSubidos > 0 && `${r.borradosSubidos} ${r.borradosSubidos === 1 ? "borrado subido" : "borrados subidos"}`,
+        r.borradosAplicados > 0 &&
+          `${r.borradosAplicados} ${r.borradosAplicados === 1 ? "borrado aplicado" : "borrados aplicados"} desde el servidor`,
       ].filter(Boolean);
       if (partes.length === 0) partes.push("todo estaba al día");
       setAviso(`Sincronización lista: ${partes.join(", ")}.`);

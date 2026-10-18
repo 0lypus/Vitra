@@ -5,12 +5,30 @@
    el otro dispositivo primero hay que importar los mismos archivos de audio.
 
    Estrategia del merge: gana la versión con la marca "actualizado" más nueva
-   (ISO UTC). Los borrados todavía no se propagan.
+   (ISO UTC). Los borrados se propagan como "tumbas" (borrado: true) con su
+   propia marca, así que también compiten: si el borrado es lo más nuevo, se
+   borra en el otro extremo; si alguien lo editó después, vuelve a existir.
 
    Si el backend tiene clave configurada, se manda en el encabezado X-Clave. */
 
-import { actualizarPista, crearLista, guardarLista, listarListas, listarPistas, type Lista, type Pista } from "./biblioteca";
+import {
+  actualizarPista,
+  clavePista,
+  crearLista,
+  eliminarBorrado,
+  eliminarLista,
+  eliminarPista,
+  guardarLista,
+  listarBorrados,
+  listarListas,
+  listarPistas,
+  type Lista,
+  type Pista,
+} from "./biblioteca";
 import { parsearLrc, serializarLrc, type LineaLetra } from "./letras";
+
+/* La clave vive en biblioteca.ts; se re-exporta acá por comodidad */
+export { clavePista };
 
 /* Encabezado con el que viaja la clave del backend */
 export const ENCABEZADO_CLAVE = "X-Clave";
@@ -36,6 +54,8 @@ export type PistaSinc = {
   favorito: boolean;
   letra: string | null;
   actualizado: string;
+  /* true = tumba: la canción se borró en el otro extremo */
+  borrado?: boolean;
 };
 
 export type ListaSinc = {
@@ -43,6 +63,8 @@ export type ListaSinc = {
   /* Claves de las pistas, una por línea, en el orden elegido */
   pistas: string;
   actualizado: string;
+  /* true = tumba: la lista se borró en el otro extremo */
+  borrado?: boolean;
 };
 
 export type Inventario = { pistas: PistaSinc[]; listas: ListaSinc[] };
@@ -52,19 +74,27 @@ export type ResultadoSync = {
   pistasActualizadas: number;
   listasSubidas: number;
   listasActualizadas: number;
+  /* Borrados que le avisamos al servidor y borrados que trajimos y aplicamos */
+  borradosSubidos: number;
+  borradosAplicados: number;
   /* Canciones que el servidor conoce pero no tenemos importadas (sin audio) */
   sinAudio: number;
 };
-
-/* Clave de emparejamiento entre dispositivos */
-export function clavePista(p: Pick<Pista, "nombreArchivo" | "tamano">) {
-  return `${p.nombreArchivo}|${p.tamano}`;
-}
 
 /* Compara dos marcas ISO UTC: como tienen el mismo formato, el orden
    alfabético coincide con el temporal. Vacío = "nunca tocado" = lo más viejo. */
 export function masNueva(a: string | undefined, b: string | undefined): boolean {
   return (a ?? "") > (b ?? "");
+}
+
+/* ¿Esta tumba local ya perdió contra lo que tiene el servidor? Vale cuando el
+   servidor tiene algo (una versión viva o su propia tumba) igual de nuevo o
+   más nuevo: en ese caso ya no hace falta subirla y se puede olvidar. */
+export function perdioContraServidor(
+  remota: { actualizado: string; borrado?: boolean } | undefined,
+  en: string,
+): boolean {
+  return remota !== undefined && !masNueva(en, remota.actualizado);
 }
 
 /* Pista local en el formato que viaja (servidor o archivo de respaldo) */
@@ -150,29 +180,106 @@ async function enviar(base: string, ruta: string, metodo: "PUT" | "DELETE", cuer
   if (!r.ok) throw new ErrorHttp(r.status, `${metodo} ${ruta} → ${r.status}`);
 }
 
-/* Sincroniza el navegador con el servidor: sube lo local más nuevo y baja
-   lo del servidor más nuevo. Lee y escribe IndexedDB directamente. */
+/* Sincroniza el navegador con el servidor: sube lo local más nuevo, baja lo
+   del servidor más nuevo y propaga los borrados de los dos lados. Lee y
+   escribe IndexedDB directamente. */
 export async function sincronizar(servidor: string, clave = ""): Promise<ResultadoSync> {
   const base = servidor.trim().replace(/\/+$/, "");
   const inventario = await pedirInventario(base, clave);
   const pistas = await listarPistas();
   const listas = await listarListas();
+  const borrados = await listarBorrados();
 
   const porId = new Map(pistas.map((p) => [p.id, p]));
   const localPorClave = new Map(pistas.map((p) => [clavePista(p), p]));
   const remotaPorClave = new Map(inventario.pistas.map((p) => [p.clave, p]));
   const remotaListaPorNombre = new Map(inventario.listas.map((l) => [l.nombre, l]));
+  const listaPorNombre = new Map(listas.map((l) => [l.nombre, l]));
 
   const res: ResultadoSync = {
     pistasSubidas: 0,
     pistasActualizadas: 0,
     listasSubidas: 0,
     listasActualizadas: 0,
+    borradosSubidos: 0,
+    borradosAplicados: 0,
     sinAudio: 0,
   };
 
-  // 1. Sube las pistas que el servidor no tiene o tiene más viejas
+  // Cosas que se borraron en este pase: no hay que subirlas ni bajar nada sobre ellas
+  const borradasPistas = new Set<number>();
+  const borradasListas = new Set<number>();
+
+  /* Saca una pista de todas las listas locales. Al quedar modificadas, las
+     listas se marcan solas para subirse más abajo (les estampa la marca). */
+  const quitarDeListas = async (id: number) => {
+    for (let i = 0; i < listas.length; i++) {
+      const l = listas[i];
+      if (!l.pistas.includes(id)) continue;
+      const nueva = { ...l, pistas: l.pistas.filter((x) => x !== id) };
+      await guardarLista(nueva);
+      listas[i] = nueva;
+    }
+  };
+
+  /* 1. Tumbas locales: si el servidor ya tiene algo igual de nuevo o más
+        nuevo, ya cumplió y se borra del local; si no, se la contamos. */
+  for (const b of borrados) {
+    const remota = b.tipo === "pista" ? remotaPorClave.get(b.clave) : remotaListaPorNombre.get(b.clave);
+    if (perdioContraServidor(remota, b.en)) {
+      await eliminarBorrado(b.tipo, b.clave);
+      continue;
+    }
+    if (b.tipo === "pista") {
+      await enviar(
+        base,
+        "/api/pistas",
+        "PUT",
+        {
+          clave: b.clave,
+          titulo: "",
+          artista: "",
+          album: "",
+          duracion: 0,
+          favorito: false,
+          letra: null,
+          actualizado: b.en,
+          borrado: true,
+        },
+        clave,
+      );
+    } else {
+      await enviar(base, "/api/listas", "PUT", { nombre: b.clave, pistas: "", actualizado: b.en, borrado: true }, clave);
+    }
+    res.borradosSubidos++;
+  }
+
+  /* 2. Borrados del servidor: se borra acá lo que no esté más nuevo. La tumba
+        no se copia al local: ya está registrada del lado del servidor. */
+  for (const remota of inventario.pistas) {
+    if (remota.borrado !== true) continue;
+    const local = localPorClave.get(remota.clave);
+    if (!local || masNueva(local.actualizado, remota.actualizado)) continue;
+    await eliminarPista(local.id, false);
+    borradasPistas.add(local.id);
+    await quitarDeListas(local.id);
+    res.borradosAplicados++;
+  }
+
+  for (const remota of inventario.listas) {
+    if (remota.borrado !== true) continue;
+    const local = listaPorNombre.get(remota.nombre);
+    if (!local || masNueva(local.actualizado, remota.actualizado)) continue;
+    await eliminarLista(local.id, false);
+    listaPorNombre.delete(remota.nombre);
+    borradasListas.add(local.id);
+    res.borradosAplicados++;
+  }
+
+  /* 3. Sube las pistas que el servidor no tiene o tiene más viejas. Si el
+        servidor tiene una tumba más nueva, la pista ya salió del camino. */
   for (const p of pistas) {
+    if (borradasPistas.has(p.id)) continue;
     const remota = remotaPorClave.get(clavePista(p));
     if (!remota || masNueva(p.actualizado, remota.actualizado)) {
       await enviar(base, "/api/pistas", "PUT", aPistaSinc(p), clave);
@@ -180,23 +287,24 @@ export async function sincronizar(servidor: string, clave = ""): Promise<Resulta
     }
   }
 
-  // 2. Baja los metadatos más nuevos (solo de las pistas cuyo audio ya tenemos).
-  //    Si el servidor no trae letra, se conserva la local: las letras no se borran.
+  /* 4. Baja los metadatos más nuevos (solo de las pistas cuyo audio tenemos).
+        Si el servidor no trae letra, se conserva la local: no se borra sola. */
   for (const p of pistas) {
+    if (borradasPistas.has(p.id)) continue;
     const remota = remotaPorClave.get(clavePista(p));
-    if (!remota || !masNueva(remota.actualizado, p.actualizado)) continue;
+    if (!remota || remota.borrado === true || !masNueva(remota.actualizado, p.actualizado)) continue;
     await actualizarPista(conDatosDeFuera(p, remota));
     res.pistasActualizadas++;
   }
 
-  for (const clave of remotaPorClave.keys()) {
-    if (!localPorClave.has(clave)) res.sinAudio++;
+  for (const [c, remota] of remotaPorClave) {
+    // Las tumbas del servidor no son canciones que falten importar
+    if (!localPorClave.has(c) && remota.borrado !== true) res.sinAudio++;
   }
 
-  // 3. Listas por nombre
-  const listaPorNombre = new Map(listas.map((l) => [l.nombre, l]));
-
+  /* 5. Listas por nombre */
   for (const l of listas) {
+    if (borradasListas.has(l.id)) continue;
     const remota = remotaListaPorNombre.get(l.nombre);
     if (!remota || masNueva(l.actualizado, remota.actualizado)) {
       await enviar(base, "/api/listas", "PUT", aListaSinc(l, porId), clave);
@@ -205,6 +313,7 @@ export async function sincronizar(servidor: string, clave = ""): Promise<Resulta
   }
 
   for (const remota of inventario.listas) {
+    if (remota.borrado === true) continue; // las tumbas ya se aplicaron arriba
     const local = listaPorNombre.get(remota.nombre);
     if (local && !masNueva(remota.actualizado, local.actualizado)) continue;
     // Traduce las claves a los ids locales; las canciones que no tenemos se omiten
