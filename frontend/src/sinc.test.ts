@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { clavePista, masNueva } from "./sinc";
+import { clavePista, masNueva, servidorSugerido } from "./sinc";
+
+describe("servidorSugerido", () => {
+  it("en la compu apunta a localhost con el puerto del backend", () => {
+    expect(servidorSugerido("localhost")).toBe("http://localhost:5041");
+  });
+
+  it("desde el celular usa la misma IP con la que se abrió la app", () => {
+    expect(servidorSugerido("192.168.0.10")).toBe("http://192.168.0.10:5041");
+  });
+
+  it("entrecomilla las direcciones IPv6", () => {
+    expect(servidorSugerido("::1")).toBe("http://[::1]:5041");
+    expect(servidorSugerido("fd00::1")).toBe("http://[fd00::1]:5041");
+  });
+
+  it("si no hay host cae en localhost y acepta otro puerto", () => {
+    expect(servidorSugerido("  ")).toBe("http://localhost:5041");
+    expect(servidorSugerido("192.168.0.10", 5199)).toBe("http://192.168.0.10:5199");
+  });
+});
 
 describe("clavePista", () => {
   it("usa nombreArchivo|tamano como clave de emparejamiento", () => {
