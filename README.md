@@ -16,6 +16,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Fondo dinámico**: el color dominante de la carátula tiñe el fondo con una transición suave.
 - **Letras sincronizadas (.lrc)**: parser propio; resalta la línea actual, se auto-centra y podés saltar haciendo clic en cualquier línea.
 - **Favoritos y listas de reproducción**: corazón en cada canción, chips de filtro y listas propias (crear, renombrar, eliminar, agregar o quitar canciones y reordenarlas con ↑/↓).
+- **Cola de reproducción**: con el botón de cola de cada canción podés ponerla “a continuación” o al final. El chip “Cola” muestra lo encolado, que se puede reordenar, quitar o vaciar, y suena antes que el resto de la biblioteca.
 - **Editar metadatos**: título, artista y álbum a mano (solo dentro de Vitra; el archivo no se toca).
 - **Respaldo en JSON**: descargá un archivo con tus metadatos, favoritos, letras y listas, e importalo cuando quieras. Sirve para no perder nada si el navegador limpia los datos y para pasar tus datos a otro dispositivo.
 - **Sincronización opcional (v2)**: con el backend propio (`backend/Vitra.Api`) podés subir y bajar metadatos, favoritos, letras y listas para tener la misma biblioteca en varios dispositivos. El audio no se sube.
@@ -35,8 +36,9 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 2. **Letras**: guardá un archivo `.lrc` con el mismo nombre que el audio (por ejemplo `cancion.mp3` + `cancion.lrc`) y agregalos juntos, o soltá el `.lrc` sobre la ventana para aplicarlo a una canción ya importada.
 3. **Listas**: el botón `+` de cada fila abre el diálogo para agregar o quitar la canción de una lista (y crear listas desde ahí). Los chips arriba de la biblioteca filtran por “Todas”, “Favoritas” o cada lista.
 4. **Reproducción**: clic en cualquier canción; la navegación (anterior/siguiente) recorre lo que esté filtrado en ese momento.
-5. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen.
-6. **Respaldo**: “Respaldo” → “Descargar respaldo” baja un `.json` con esos mismos datos. Si algún día el navegador limpia el almacenamiento (o querés mudarte de equipo), agregá de nuevo los archivos de audio y tocá “Importar respaldo...”: se vuelven a aplicar favoritos, letras, títulos y listas sobre las canciones que coincidan por nombre y tamaño.
+5. **Cola**: el botón de cola de cada fila (el ▶ con rayitas) abre el diálogo para poner esa canción “a continuación” o “al final”. El chip “Cola” abre el panel, donde se reordena con ↑/↓, se quitan canciones o se vacía. Lo encolado suena antes que el orden normal (biblioteca, favoritas o lista activa); la cola es de la sesión: al cerrar la app se pierde.
+6. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen.
+7. **Respaldo**: “Respaldo” → “Descargar respaldo” baja un `.json` con esos mismos datos. Si algún día el navegador limpia el almacenamiento (o querés mudarte de equipo), agregá de nuevo los archivos de audio y tocá “Importar respaldo...”: se vuelven a aplicar favoritos, letras, títulos y listas sobre las canciones que coincidan por nombre y tamaño.
 
 ## Desarrollo
 
@@ -46,7 +48,7 @@ npm install
 npm run dev      # desarrollo con hot reload
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
-npm test         # tests (parser .lrc, utilidades, sync y respaldo)
+npm test         # tests (parser .lrc, utilidades, cola, sync y respaldo)
 ```
 
 Stack: React + TypeScript + Vite, `idb` (IndexedDB), `music-metadata` y `vite-plugin-pwa`. Sin frameworks de UI: CSS a mano con variables y `backdrop-filter`. Los tests usan `vitest` y, para los que tocan IndexedDB, `fake-indexeddb` (solo dependencia de desarrollo).
@@ -57,6 +59,7 @@ Estructura:
 frontend/src/
   App.tsx        # interfaz y lógica del reproductor
   biblioteca.ts  # IndexedDB: pistas, archivos, listas, favoritos
+  cola.ts        # cola de reproducción (lógica pura)
   letras.ts      # parser y serializador de letras .lrc
   respaldo.ts    # respaldo de la biblioteca en JSON
   sinc.ts        # cliente del backend (subir y bajar cambios)
@@ -88,9 +91,10 @@ Detalles de los endpoints en `backend/README.md`.
 
 ## Roadmap
 
-- [ ] Repetir ordenado (colas) y favoritos con carátula destacada
+- [x] Cola de reproducción manual (a continuación / al final, con panel para reordenar)
+- [ ] Carátula destacada en las favoritas
 - [x] Edición de metadatos y renombrado de listas
-- [x] Tests unitarios (parser `.lrc`, utilidades, sincronización)
+- [x] Tests unitarios (parser `.lrc`, utilidades, cola, sincronización y respaldo)
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
 - [ ] Propagar borrados al sincronizar (hoy solo se suben y bajan cambios)
 - [ ] Autenticación con clave para el backend (hoy es solo para red local)
