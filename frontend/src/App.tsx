@@ -19,6 +19,7 @@ import {
   type Pista,
 } from "./biblioteca";
 import { parsearLrc, type LineaLetra } from "./letras";
+import { aplicarRespaldo, crearRespaldo, leerRespaldo, nombreArchivoRespaldo } from "./respaldo";
 import { sincronizar } from "./sinc";
 import { formato, formatoTamano, normalizar } from "./utilidades";
 
@@ -169,6 +170,13 @@ const IcSinc = () => (
     <path d="M20.5 7.5v4h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </Icono>
 );
+const IcRespaldo = () => (
+  <Icono>
+    <path d="M12 3v9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M8 8.5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M5 14.5v3a2 2 0 002 2h10a2 2 0 002-2v-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </Icono>
+);
 const IcOndas = () => (
   <Icono>
     <path
@@ -264,6 +272,7 @@ export default function App() {
   const [servidor, setServidor] = useState(servidorInicial); // URL del backend de sincronización
   const [verSync, setVerSync] = useState(false); // diálogo de sincronización abierto
   const [sincronizando, setSincronizando] = useState(false);
+  const [verRespaldo, setVerRespaldo] = useState(false); // diálogo de respaldo abierto
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
   const listaRef = useRef<HTMLUListElement>(null); // contenedor scrolleable de la biblioteca
@@ -712,17 +721,18 @@ export default function App() {
 
   // Escape cierra los diálogos abiertos
   useEffect(() => {
-    if (agregandoA === null && editando === null && !verSync) return;
+    if (agregandoA === null && editando === null && !verSync && !verRespaldo) return;
     const tecla = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setAgregandoA(null);
         setEditando(null);
         setVerSync(false);
+        setVerRespaldo(false);
       }
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [agregandoA, editando, verSync]);
+  }, [agregandoA, editando, verSync, verRespaldo]);
 
   // Recuerda la URL del backend para la próxima vez
   useEffect(() => {
@@ -764,6 +774,51 @@ export default function App() {
       setAviso("No se pudo sincronizar. ¿Está corriendo el backend y bien escrita la URL?");
     } finally {
       setSincronizando(false);
+    }
+  }
+
+  /* Baja un archivo .json con los datos de la biblioteca (sin el audio) */
+  function descargarRespaldo() {
+    if (pistas.length === 0 && listas.length === 0) {
+      setAviso("Todavía no hay nada para respaldar.");
+      return;
+    }
+    const texto = crearRespaldo(pistas, listas);
+    const url = URL.createObjectURL(new Blob([texto], { type: "application/json" }));
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = nombreArchivoRespaldo();
+    enlace.click();
+    // Se libera el blob un rato después, para no cortar la descarga
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setAviso(`Respaldo descargado: ${pistas.length} canciones y ${listas.length} listas.`);
+    setVerRespaldo(false);
+  }
+
+  /* Lee un archivo de respaldo y lo aplica sobre la biblioteca */
+  async function importarRespaldo(e: ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = ""; // así se puede volver a elegir el mismo archivo
+    if (!archivo) return;
+    try {
+      const r = leerRespaldo(await archivo.text());
+      const res = await aplicarRespaldo(r);
+      setPistas(await listarPistas());
+      setListas(await listarListas());
+      const partes = [
+        `${res.pistasAplicadas} ${res.pistasAplicadas === 1 ? "canción actualizada" : "canciones actualizadas"}`,
+        `${res.listasAplicadas} ${res.listasAplicadas === 1 ? "lista aplicada" : "listas aplicadas"}`,
+      ];
+      let mensaje = `Respaldo importado: ${partes.join(" y ")}.`;
+      if (res.sinAudio > 0) {
+        mensaje += ` Quedaron ${res.sinAudio} ${
+          res.sinAudio === 1 ? "canción sin audio" : "canciones sin audio"
+        }: agregá esos archivos y volvé a importar el respaldo para completarlas.`;
+      }
+      setAviso(mensaje);
+      setVerRespaldo(false);
+    } catch (err) {
+      setAviso(err instanceof Error ? err.message : "No se pudo leer el respaldo.");
     }
   }
 
@@ -1179,15 +1234,25 @@ export default function App() {
         >
           Cargar canciones de ejemplo
         </button>
-        <button
-          className="add glass demo"
-          onClick={() => setVerSync(true)}
-          disabled={sincronizando}
-          title="Subir y bajar tus datos con el backend"
-        >
-          <IcSinc />
-          {sincronizando ? "Sincronizando..." : "Sincronizar"}
-        </button>
+        <div className="acciones-fila">
+          <button
+            className="add glass demo"
+            onClick={() => setVerSync(true)}
+            disabled={sincronizando}
+            title="Subir y bajar tus datos con el backend"
+          >
+            <IcSinc />
+            {sincronizando ? "Sincronizando..." : "Sincronizar"}
+          </button>
+          <button
+            className="add glass demo"
+            onClick={() => setVerRespaldo(true)}
+            title="Guardar o restaurar tus datos en un archivo"
+          >
+            <IcRespaldo />
+            Respaldo
+          </button>
+        </div>
       </div>
 
       {aviso && <p className="aviso">{aviso}</p>}
@@ -1489,6 +1554,41 @@ export default function App() {
             <button className="add-lista" onClick={() => void sincronizarAhora()} disabled={sincronizando || !servidor.trim()}>
               {sincronizando ? "Sincronizando..." : "Sincronizar ahora"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {verRespaldo && (
+        <div className="modal-fondo" onClick={() => setVerRespaldo(false)}>
+          <div
+            className="modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Respaldo de la biblioteca"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-titulo">
+              <h3>Respaldo</h3>
+              <button className="btn-icon" onClick={() => setVerRespaldo(false)} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+            <p className="muted pie-edicion">
+              Descarga un archivo .json con tus canciones (título, artista, álbum, favoritos y letras) y tus listas. Los
+              archivos de audio no entran: sirve para guardar una copia o pasar los datos a otro dispositivo, y después
+              hay que volver a agregar los mismos audios.
+            </p>
+            <button className="add-lista" onClick={descargarRespaldo}>
+              Descargar respaldo
+            </button>
+            <label className="add glass demo">
+              Importar respaldo...
+              <input type="file" accept=".json,application/json" onChange={importarRespaldo} />
+            </label>
+            <p className="muted pie-edicion">
+              Al importar solo se pisan los datos más viejos que los que ya tenés, y las canciones cuyo audio no esté
+              agregado quedan para cuando lo agregues.
+            </p>
           </div>
         </div>
       )}

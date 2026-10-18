@@ -175,6 +175,24 @@ body {
   vertical-align: -0.15rem;
 }
 
+/* Acciones secundarias, una al lado de la otra (Sincronizar / Respaldo) */
+.acciones-fila {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.acciones-fila > * {
+  flex: 1;
+  padding: 0.85rem 0.5rem;
+}
+
+/* Los botones dentro de los diálogos ocupan todo el ancho */
+.modal .add-lista,
+.modal .add {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
 .botones {
   display: flex;
   flex-direction: column;
