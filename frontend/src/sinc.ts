@@ -44,6 +44,12 @@ export function clavePista(p: Pick<Pista, "nombreArchivo" | "tamano">) {
   return `${p.nombreArchivo}|${p.tamano}`;
 }
 
+/* Compara dos marcas ISO UTC: como tienen el mismo formato, el orden
+   alfabético coincide con el temporal. Vacío = "nunca tocado" = lo más viejo. */
+export function masNueva(a: string | undefined, b: string | undefined): boolean {
+  return (a ?? "") > (b ?? "");
+}
+
 function aPistaSinc(p: Pista): PistaSinc {
   return {
     clave: clavePista(p),
@@ -96,8 +102,7 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
   // 1. Sube las pistas que el servidor no tiene o tiene más viejas
   for (const p of pistas) {
     const remota = remotaPorClave.get(clavePista(p));
-    const act = p.actualizado ?? "";
-    if (!remota || (remota.actualizado ?? "") < act) {
+    if (!remota || masNueva(p.actualizado, remota.actualizado)) {
       await enviar(base, "/api/pistas", "PUT", aPistaSinc(p));
       res.pistasSubidas++;
     }
@@ -107,7 +112,7 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
   //    Si el servidor no trae letra, se conserva la local: las letras no se borran.
   for (const p of pistas) {
     const remota = remotaPorClave.get(clavePista(p));
-    if (!remota || (p.actualizado ?? "") >= (remota.actualizado ?? "")) continue;
+    if (!remota || !masNueva(remota.actualizado, p.actualizado)) continue;
     let letra: LineaLetra[] | undefined = p.letra;
     if (remota.letra) {
       const l = parsearLrc(remota.letra);
@@ -134,8 +139,7 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
 
   for (const l of listas) {
     const remota = remotaListaPorNombre.get(l.nombre);
-    const act = l.actualizado ?? "";
-    if (!remota || (remota.actualizado ?? "") < act) {
+    if (!remota || masNueva(l.actualizado, remota.actualizado)) {
       await enviar(
         base,
         "/api/listas",
@@ -146,7 +150,7 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
             .map((id) => (porId.has(id) ? clavePista(porId.get(id)!) : null))
             .filter((c): c is string => c !== null)
             .join("\n"),
-          actualizado: act,
+          actualizado: l.actualizado ?? new Date(0).toISOString(),
         } satisfies ListaSinc,
       );
       res.listasSubidas++;
@@ -154,16 +158,15 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
   }
 
   for (const remota of inventario.listas) {
-    const act = remota.actualizado ?? "";
     const local = listaPorNombre.get(remota.nombre);
-    if (local && (local.actualizado ?? "") >= act) continue;
+    if (local && !masNueva(remota.actualizado, local.actualizado)) continue;
     // Traduce las claves a los ids locales; las canciones que no tenemos se omiten
     const ids = remota.pistas
       .split(/\r?\n/)
       .map((clave) => localPorClave.get(clave.trim())?.id)
       .filter((id): id is number => id !== undefined);
-    if (local) await guardarLista({ ...local, pistas: ids }, act);
-    else await crearLista(remota.nombre, ids, act);
+    if (local) await guardarLista({ ...local, pistas: ids }, remota.actualizado);
+    else await crearLista(remota.nombre, ids, remota.actualizado);
     res.listasActualizadas++;
   }
 
