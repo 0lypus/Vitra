@@ -18,6 +18,7 @@ import {
   type Lista,
   type Pista,
 } from "./biblioteca";
+import { agregarAlFinal, limpiarCola, moverEnCola, quitarDeCola, reproducirAContinuacion, sacarSiguiente } from "./cola";
 import { parsearLrc, type LineaLetra } from "./letras";
 import { aplicarRespaldo, crearRespaldo, leerRespaldo, nombreArchivoRespaldo } from "./respaldo";
 import { sincronizar } from "./sinc";
@@ -177,6 +178,12 @@ const IcRespaldo = () => (
     <path d="M5 14.5v3a2 2 0 002 2h10a2 2 0 002-2v-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
   </Icono>
 );
+const IcCola = () => (
+  <Icono>
+    <path d="M3.5 7h8M3.5 12h6M3.5 17h5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    <path d="M14 11.5l6 3.2-6 3.2v-6.4z" />
+  </Icono>
+);
 const IcOndas = () => (
   <Icono>
     <path
@@ -273,6 +280,9 @@ export default function App() {
   const [verSync, setVerSync] = useState(false); // diálogo de sincronización abierto
   const [sincronizando, setSincronizando] = useState(false);
   const [verRespaldo, setVerRespaldo] = useState(false); // diálogo de respaldo abierto
+  const [cola, setCola] = useState<number[]>([]); // cola de reproducción (ids, en orden)
+  const [colaPara, setColaPara] = useState<number | null>(null); // pista elegida para encolar
+  const [verCola, setVerCola] = useState(false); // panel de la cola abierto
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
   const listaRef = useRef<HTMLUListElement>(null); // contenedor scrolleable de la biblioteca
@@ -297,6 +307,7 @@ export default function App() {
     : base;
   const indice = pistasVisibles.findIndex((p) => p.id === actualId);
   const pista = pistas.find((p) => p.id === actualId);
+  const pistaCola = colaPara !== null ? porId.get(colaPara) : undefined; // canción del diálogo "encolar"
   const favoritasCount = useMemo(() => pistas.filter((p) => p.favorito).length, [pistas]);
 
   /* Virtualización: solo se pintan las filas que caben en pantalla (más un margen) */
@@ -575,6 +586,7 @@ export default function App() {
   }
 
   async function quitar(p: Pista) {
+    setCola((prev) => quitarDeCola(prev, p.id)); // ya no puede sonar: la saco de la cola
     if (p.id === actualId) {
       const audio = audioRef.current;
       audio?.pause();
@@ -615,6 +627,26 @@ export default function App() {
     } catch {
       setAviso("No se pudo marcar la canción como favorita.");
     }
+  }
+
+  /* Cola de reproducción: la canción suena apenas termina la actual */
+  function encolarAcontinuacion(p: Pista) {
+    setCola((c) => reproducirAContinuacion(c, p.id));
+    setColaPara(null);
+    setAviso(`“${p.titulo}” suena a continuación.`);
+  }
+
+  /* Cola de reproducción: la canción queda al final de lo encolado */
+  function encolarAlFinal(p: Pista) {
+    setCola((c) => agregarAlFinal(c, p.id));
+    setColaPara(null);
+    setAviso(`“${p.titulo}” quedó al final de la cola.`);
+  }
+
+  /* Abre el panel de la cola, descartando las canciones que ya no existen */
+  function abrirCola() {
+    setCola((c) => limpiarCola(c, (id) => porId.has(id)));
+    setVerCola(true);
   }
 
   function activarLista(id: number) {
@@ -721,18 +753,20 @@ export default function App() {
 
   // Escape cierra los diálogos abiertos
   useEffect(() => {
-    if (agregandoA === null && editando === null && !verSync && !verRespaldo) return;
+    if (agregandoA === null && editando === null && !verSync && !verRespaldo && colaPara === null && !verCola) return;
     const tecla = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setAgregandoA(null);
         setEditando(null);
         setVerSync(false);
         setVerRespaldo(false);
+        setColaPara(null);
+        setVerCola(false);
       }
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [agregandoA, editando, verSync, verRespaldo]);
+  }, [agregandoA, editando, verSync, verRespaldo, colaPara, verCola]);
 
   // Recuerda la URL del backend para la próxima vez
   useEffect(() => {
@@ -964,7 +998,6 @@ export default function App() {
 
   function siguiente(automatico = false) {
     const audio = audioRef.current;
-    if (pistasVisibles.length === 0) return;
 
     const reiniciar = () => {
       if (audio) {
@@ -972,6 +1005,19 @@ export default function App() {
         audio.play().catch(() => {});
       }
     };
+
+    // La cola manual manda: si hay algo encolado, va eso (aunque esté en repetir una)
+    const deCola = sacarSiguiente(cola, (id) => porId.has(id));
+    if (deCola.id !== null) {
+      setCola(deCola.cola);
+      // Si encolaste la que ya está sonando, hay que darle play de nuevo
+      if (deCola.id === actualId) reiniciar();
+      else setActualId(deCola.id);
+      return;
+    }
+    if (deCola.cola !== cola) setCola(deCola.cola); // limpia las que ya no existen
+
+    if (pistasVisibles.length === 0) return;
 
     // Repetir una: cuando termina sola, vuelve a empezar la misma pista
     if (automatico && repetir === "una") {
@@ -1312,6 +1358,15 @@ export default function App() {
               <button className="chip nuevo" onClick={nuevaLista} title="Crear una lista nueva">
                 + Lista
               </button>
+              {cola.length > 0 && (
+                <button
+                  className={`chip cola ${verCola ? "on" : ""}`}
+                  onClick={abrirCola}
+                  title="Ver la cola de reproducción"
+                >
+                  Cola ({cola.length})
+                </button>
+              )}
             </div>
             <div className="buscador">
               <IcLupa />
@@ -1382,6 +1437,14 @@ export default function App() {
                     </button>
                   </>
                 )}
+                <button
+                  className={`btn-icon ${cola.includes(p.id) ? "en-cola" : ""}`}
+                  onClick={() => setColaPara(p.id)}
+                  aria-label={`Encolar ${p.titulo}`}
+                  title="Cola de reproducción"
+                >
+                  <IcCola />
+                </button>
                 <button
                   className="btn-icon"
                   onClick={() => setAgregandoA(p.id)}
@@ -1589,6 +1652,135 @@ export default function App() {
               Al importar solo se pisan los datos más viejos que los que ya tenés, y las canciones cuyo audio no esté
               agregado quedan para cuando lo agregues.
             </p>
+          </div>
+        </div>
+      )}
+
+      {colaPara !== null && pistaCola && (
+        <div className="modal-fondo" onClick={() => setColaPara(null)}>
+          <div
+            className="modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Encolar canción"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-titulo">
+              <h3>Cola</h3>
+              <button className="btn-icon" onClick={() => setColaPara(null)} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+            <p className="muted pie-edicion">{pistaCola.titulo}</p>
+            <button className="menu-linea" onClick={() => encolarAcontinuacion(pistaCola)}>
+              <span className="check">⇥</span>
+              <span className="nombre-lista">Reproducir a continuación</span>
+            </button>
+            <button className="menu-linea" onClick={() => encolarAlFinal(pistaCola)}>
+              <span className="check">⇥</span>
+              <span className="nombre-lista">Agregar al final de la cola</span>
+            </button>
+            {cola.includes(pistaCola.id) && (
+              <button
+                className="menu-linea"
+                onClick={() => {
+                  setCola((c) => quitarDeCola(c, pistaCola.id));
+                  setColaPara(null);
+                }}
+              >
+                <span className="check">×</span>
+                <span className="nombre-lista">Quitar de la cola</span>
+              </button>
+            )}
+            {cola.length > 0 && (
+              <button
+                className="add-lista"
+                onClick={() => {
+                  abrirCola();
+                  setColaPara(null);
+                }}
+              >
+                Ver la cola ({cola.length})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {verCola && (
+        <div className="modal-fondo" onClick={() => setVerCola(false)}>
+          <div
+            className="modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cola de reproducción"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-titulo">
+              <h3>Cola</h3>
+              <button className="btn-icon" onClick={() => setVerCola(false)} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+            {cola.length === 0 ? (
+              <p className="muted pie-edicion">
+                No hay nada encolado. Con el botón de cola de cada canción podés ponerla “a continuación” o al final.
+              </p>
+            ) : (
+              <>
+                <p className="muted pie-edicion">Suenan antes que el resto de la biblioteca, en este orden.</p>
+                {cola.map((id, i) => {
+                  const p = porId.get(id);
+                  if (!p) return null;
+                  return (
+                    <div key={id} className="menu-linea">
+                      <span className="cola-num">{i + 1}</span>
+                      <button
+                        className="cola-tema"
+                        onClick={() => {
+                          prepararAnalizador();
+                          setActualId(id);
+                          setCola((c) => quitarDeCola(c, id)); // ahora es la que suena
+                          setVerCola(false);
+                        }}
+                        title="Reproducir ahora"
+                      >
+                        {p.titulo}
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => setCola((c) => moverEnCola(c, id, -1))}
+                        disabled={i === 0}
+                        aria-label={`Subir ${p.titulo} en la cola`}
+                        title="Subir en la cola"
+                      >
+                        <IcSubir />
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => setCola((c) => moverEnCola(c, id, 1))}
+                        disabled={i === cola.length - 1}
+                        aria-label={`Bajar ${p.titulo} en la cola`}
+                        title="Bajar en la cola"
+                      >
+                        <IcBajar />
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => setCola((c) => quitarDeCola(c, id))}
+                        aria-label={`Quitar ${p.titulo} de la cola`}
+                        title="Quitar de la cola"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+                <button className="add-lista" onClick={() => setCola([])}>
+                  Vaciar la cola
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

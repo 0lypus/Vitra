@@ -755,6 +755,46 @@ body {
   color: var(--gold);
 }
 
+/* Canción encolada: se marca el botón de cola */
+.btn-icon.en-cola {
+  color: var(--accent);
+}
+
+/* Chip de la cola de reproducción, en la fila de filtros */
+.chip.cola {
+  color: var(--text);
+  font-weight: 600;
+  border-color: var(--accent);
+}
+
+/* Filas del panel de la cola: número, título y acciones */
+.cola-num {
+  flex: none;
+  width: 1.2rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.cola-tema {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.cola-tema:hover {
+  color: var(--gold);
+}
+
 .pie {
   margin: 0;
   text-align: center;
