@@ -17,6 +17,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Letras sincronizadas (.lrc)**: parser propio; resalta la línea actual, se auto-centra y podés saltar haciendo clic en cualquier línea.
 - **Favoritos y listas de reproducción**: corazón en cada canción, chips de filtro y listas propias (crear, renombrar, eliminar, agregar o quitar canciones y reordenarlas con ↑/↓).
 - **Editar metadatos**: título, artista y álbum a mano (solo dentro de Vitra; el archivo no se toca).
+- **Respaldo en JSON**: descargá un archivo con tus metadatos, favoritos, letras y listas, e importalo cuando quieras. Sirve para no perder nada si el navegador limpia los datos y para pasar tus datos a otro dispositivo.
 - **Sincronización opcional (v2)**: con el backend propio (`backend/Vitra.Api`) podés subir y bajar metadatos, favoritos, letras y listas para tener la misma biblioteca en varios dispositivos. El audio no se sube.
 - **Aleatorio y repetir** (todas / una), recordados entre sesiones.
 - **Buscador** por título o artista, sin importar mayúsculas ni tildes.
@@ -35,6 +36,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 3. **Listas**: el botón `+` de cada fila abre el diálogo para agregar o quitar la canción de una lista (y crear listas desde ahí). Los chips arriba de la biblioteca filtran por “Todas”, “Favoritas” o cada lista.
 4. **Reproducción**: clic en cualquier canción; la navegación (anterior/siguiente) recorre lo que esté filtrado en ese momento.
 5. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen.
+6. **Respaldo**: “Respaldo” → “Descargar respaldo” baja un `.json` con esos mismos datos. Si algún día el navegador limpia el almacenamiento (o querés mudarte de equipo), agregá de nuevo los archivos de audio y tocá “Importar respaldo...”: se vuelven a aplicar favoritos, letras, títulos y listas sobre las canciones que coincidan por nombre y tamaño.
 
 ## Desarrollo
 
@@ -44,9 +46,10 @@ npm install
 npm run dev      # desarrollo con hot reload
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
+npm test         # tests (parser .lrc, utilidades, sync y respaldo)
 ```
 
-Stack: React + TypeScript + Vite, `idb` (IndexedDB), `music-metadata` y `vite-plugin-pwa`. Sin frameworks de UI: CSS a mano con variables y `backdrop-filter`.
+Stack: React + TypeScript + Vite, `idb` (IndexedDB), `music-metadata` y `vite-plugin-pwa`. Sin frameworks de UI: CSS a mano con variables y `backdrop-filter`. Los tests usan `vitest` y, para los que tocan IndexedDB, `fake-indexeddb` (solo dependencia de desarrollo).
 
 Estructura:
 
@@ -55,6 +58,7 @@ frontend/src/
   App.tsx        # interfaz y lógica del reproductor
   biblioteca.ts  # IndexedDB: pistas, archivos, listas, favoritos
   letras.ts      # parser y serializador de letras .lrc
+  respaldo.ts    # respaldo de la biblioteca en JSON
   sinc.ts        # cliente del backend (subir y bajar cambios)
   utilidades.ts  # formato de tiempo, tamaños y normalización de texto
   index.css      # estilos (vidrio, tema oscuro)
@@ -76,7 +80,7 @@ Detalles de los endpoints en `backend/README.md`.
 
 - **iPhone/iPad (Safari)**: la app no puede controlar el volumen del sistema, puede limpiar el almacenamiento si el dispositivo está con poco espacio (por eso pide persistencia) y el primer `play()` requiere un toque del usuario.
 - **Firefox** no implementa `backdrop-filter` igual que Chrome; la interfaz funciona, se ve un poco distinta.
-- Los archivos importados no se pueden recuperar si el navegador borra los datos del sitio; Vitra pide almacenamiento persistente para reducir ese riesgo.
+- Los archivos importados no se pueden recuperar si el navegador borra los datos del sitio; Vitra pide almacenamiento persistente para reducir ese riesgo. Si tenés un respaldo en JSON, volvés a agregar los audios e importás el archivo: recuperás metadatos, favoritos, letras y listas.
 
 ## Canciones de ejemplo
 
@@ -91,7 +95,7 @@ Detalles de los endpoints en `backend/README.md`.
 - [ ] Propagar borrados al sincronizar (hoy solo se suben y bajan cambios)
 - [ ] Autenticación con clave para el backend (hoy es solo para red local)
 - [ ] Migraciones de EF Core en vez de `EnsureCreated`
-- [ ] Exportar e importar la biblioteca en JSON
+- [x] Exportar e importar la biblioteca en JSON
 
 ## Licencia
 
