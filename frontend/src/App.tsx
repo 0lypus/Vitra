@@ -21,7 +21,7 @@ import {
 import { agregarAlFinal, limpiarCola, moverEnCola, quitarDeCola, reproducirAContinuacion, sacarSiguiente } from "./cola";
 import { parsearLrc, type LineaLetra } from "./letras";
 import { aplicarRespaldo, crearRespaldo, leerRespaldo, nombreArchivoRespaldo } from "./respaldo";
-import { sincronizar } from "./sinc";
+import { ErrorHttp, sincronizar } from "./sinc";
 import { formato, formatoTamano, normalizar } from "./utilidades";
 
 /* Altura fija (px) de cada fila de la biblioteca: permite virtualizar la lista */
@@ -74,6 +74,15 @@ function servidorInicial() {
     /* sin acceso al almacenamiento */
   }
   return "http://localhost:5041";
+}
+
+function claveInicial() {
+  try {
+    return localStorage.getItem("vitra:clave") ?? "";
+  } catch {
+    /* sin acceso al almacenamiento */
+  }
+  return "";
 }
 
 /* Íconos SVG: se ven igual en todos los dispositivos */
@@ -277,6 +286,7 @@ export default function App() {
   const [editando, setEditando] = useState<Pista | null>(null); // pista en el diálogo "editar metadatos"
   const [borrador, setBorrador] = useState({ titulo: "", artista: "", album: "" });
   const [servidor, setServidor] = useState(servidorInicial); // URL del backend de sincronización
+  const [clave, setClave] = useState(claveInicial); // clave de acceso del backend (si tiene)
   const [verSync, setVerSync] = useState(false); // diálogo de sincronización abierto
   const [sincronizando, setSincronizando] = useState(false);
   const [verRespaldo, setVerRespaldo] = useState(false); // diálogo de respaldo abierto
@@ -777,13 +787,22 @@ export default function App() {
     }
   }, [servidor]);
 
+  // Recuerda la clave del backend para la próxima vez
+  useEffect(() => {
+    try {
+      localStorage.setItem("vitra:clave", clave);
+    } catch {
+      /* sin acceso al almacenamiento */
+    }
+  }, [clave]);
+
   /* Sube y baja metadatos, favoritos, letras y listas con el backend */
   async function sincronizarAhora() {
     if (!servidor.trim()) return;
     setSincronizando(true);
     setAviso("");
     try {
-      const r = await sincronizar(servidor);
+      const r = await sincronizar(servidor, clave);
       // Recarga el estado desde IndexedDB, que ya quedó actualizado
       setPistas(await listarPistas());
       setListas(await listarListas());
@@ -804,8 +823,12 @@ export default function App() {
           }: importá esos archivos para completarlas.`,
         );
       }
-    } catch {
-      setAviso("No se pudo sincronizar. ¿Está corriendo el backend y bien escrita la URL?");
+    } catch (e) {
+      if (e instanceof ErrorHttp && e.status === 401) {
+        setAviso("El servidor pide una clave de acceso y la que mandé no coincide. Revisala en el diálogo de Sincronizar.");
+      } else {
+        setAviso("No se pudo sincronizar. ¿Está corriendo el backend y bien escrita la URL?");
+      }
     } finally {
       setSincronizando(false);
     }
@@ -1609,10 +1632,21 @@ export default function App() {
                 spellCheck={false}
               />
             </label>
+            <label className="campo-editar">
+              Clave de acceso (si el backend tiene una)
+              <input
+                type="password"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                placeholder="La misma que configuraste en el backend"
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </label>
             <p className="muted pie-edicion">
               Sube metadatos, favoritos, letras y listas; y baja lo que esté más nuevo en el servidor. Los archivos de
               audio no se suben: importá los mismos archivos en el otro dispositivo para que se emparejen por nombre y
-              tamaño.
+              tamaño. Si el servidor no pide clave, dejá el campo vacío.
             </p>
             <button className="add-lista" onClick={() => void sincronizarAhora()} disabled={sincronizando || !servidor.trim()}>
               {sincronizando ? "Sincronizando..." : "Sincronizar ahora"}
