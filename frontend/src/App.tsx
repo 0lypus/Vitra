@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import {
   baseNombre,
   eliminarPista,
@@ -192,6 +192,7 @@ export default function App() {
   const [aleatorio, setAleatorio] = useState(aleatorioInicial);
   const [repetir, setRepetir] = useState<Repetir>(repetirInicial);
   const [busqueda, setBusqueda] = useState("");
+  const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
 
   // La lista filtrada por la búsqueda; la navegación (siguiente/anterior) recorre esta
@@ -367,7 +368,7 @@ export default function App() {
     };
   }, [sonando, duracion, tiempo, pista, aleatorio, repetir]);
 
-  /* Importa archivos de audio y letras .lrc (del input o de la demo) */
+  /* Importa archivos de audio y letras .lrc (del input, de la demo o soltados en la ventana) */
   async function importarArchivos(entradas: File[]) {
     if (entradas.length === 0) return;
 
@@ -621,9 +622,44 @@ export default function App() {
     document.documentElement.style.setProperty("--pista-color", pista?.color ?? "rgb(59, 28, 148)");
   }, [pista?.color]);
 
+  // Si sueltan un archivo fuera de la zona, que el navegador no intente abrirlo en una pestaña nueva
+  useEffect(() => {
+    const evitar = (e: globalThis.DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", evitar);
+    window.addEventListener("drop", evitar);
+    return () => {
+      window.removeEventListener("dragover", evitar);
+      window.removeEventListener("drop", evitar);
+    };
+  }, []);
+
+  function soltar(e: DragEvent<HTMLElement>) {
+    e.preventDefault();
+    setSobre(false);
+    const archivos = Array.from(e.dataTransfer?.files ?? []).filter(
+      (f) => f.type.startsWith("audio/") || /\.(mp3|m4a|aac|ogg|opus|wav|flac|webm|mp4|lrc)$/i.test(f.name),
+    );
+    void importarArchivos(archivos);
+  }
+
   return (
-    <main className="app">
+    <main
+      className="app"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setSobre(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSobre(false);
+      }}
+      onDrop={soltar}
+    >
       <div className="fondo" aria-hidden="true" />
+      {sobre && (
+        <div className="drop-overlay" aria-hidden="true">
+          Soltá tus canciones acá
+        </div>
+      )}
       <header className="brand">
         <img src="/pwa-192x192.png" alt="" />
         <h1>Vitra</h1>
