@@ -7,6 +7,7 @@ import {
   eliminarPista,
   espacioUsado,
   guardarLetra,
+  guardarLista,
   guardarPista,
   leerMetadatos,
   listarListas,
@@ -135,6 +136,11 @@ const IcCorazon = ({ lleno }: { lleno: boolean }) => (
     />
   </Icono>
 );
+const IcMas = () => (
+  <Icono>
+    <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
+  </Icono>
+);
 const IcAleatorio = () => (
   <Icono>
     <path d="M16 3h5v5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -211,6 +217,7 @@ export default function App() {
   const [soloFavoritas, setSoloFavoritas] = useState(false);
   const [listas, setListas] = useState<Lista[]>([]);
   const [listaActiva, setListaActiva] = useState<number | null>(null);
+  const [agregandoA, setAgregandoA] = useState<number | null>(null); // pista elegida en el diálogo "agregar a lista"
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
 
@@ -539,6 +546,42 @@ export default function App() {
       setAviso("No se pudo eliminar la lista.");
     }
   }
+
+  /* Quita o agrega una pista a una lista (el diálogo queda abierto para varias listas) */
+  async function alternarEnLista(l: Lista, pistaId: number) {
+    const nueva: Lista = {
+      ...l,
+      pistas: l.pistas.includes(pistaId) ? l.pistas.filter((x) => x !== pistaId) : [...l.pistas, pistaId],
+    };
+    setListas((prev) => prev.map((x) => (x.id === nueva.id ? nueva : x)));
+    try {
+      await guardarLista(nueva);
+    } catch {
+      setAviso("No se pudo actualizar la lista.");
+    }
+  }
+
+  async function crearListaYAgregar(nombre: string, pistaId: number) {
+    if (!nombre.trim()) return;
+    try {
+      const creada = await crearLista(nombre);
+      const conPista: Lista = { ...creada, pistas: [pistaId] };
+      await guardarLista(conPista);
+      setListas((prev) => [...prev, conPista]);
+    } catch {
+      setAviso("No se pudo crear la lista.");
+    }
+  }
+
+  // Escape cierra el diálogo "agregar a una lista"
+  useEffect(() => {
+    if (agregandoA === null) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAgregandoA(null);
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [agregandoA]);
 
   function alternar() {
     const audio = audioRef.current;
@@ -936,7 +979,7 @@ export default function App() {
         ) : pistasVisibles.length === 0 ? (
           <p className="empty">
             {lista
-              ? `La lista “${lista.nombre}” todavía no tiene canciones.`
+              ? `La lista “${lista.nombre}” todavía no tiene canciones. Tocá el + de cualquier canción para sumarla.`
               : soloFavoritas
                 ? "Todavía no marcaste ninguna favorita. Tocá el corazón de una canción."
                 : `No hay canciones que coincidan con “${busqueda}”.`}
@@ -952,6 +995,14 @@ export default function App() {
                     <span className="artista">{p.artista}</span>
                   </span>
                   {p.duracion > 0 && <span className="dur">{formato(p.duracion)}</span>}
+                </button>
+                <button
+                  className="btn-icon"
+                  onClick={() => setAgregandoA(p.id)}
+                  aria-label={`Agregar ${p.titulo} a una lista`}
+                  title="Agregar a una lista"
+                >
+                  <IcMas />
                 </button>
                 <button
                   className={`btn-icon ${p.favorito ? "fav" : ""}`}
@@ -976,8 +1027,50 @@ export default function App() {
           {pistasVisibles.length === pistas.length
             ? `${pistas.length} ${pistas.length === 1 ? "canción" : "canciones"}`
             : `${pistasVisibles.length} de ${pistas.length} canciones`}
+          {lista && ` en “${lista.nombre}”`}
           {espacio !== null && ` · ${formatoTamano(espacio)} usados`}
         </p>
+      )}
+
+      {agregandoA !== null && (
+        <div className="modal-fondo" onClick={() => setAgregandoA(null)}>
+          <div
+            className="modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Agregar a una lista"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-titulo">
+              <h3>¿A qué lista?</h3>
+              <button className="btn-icon" onClick={() => setAgregandoA(null)} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+            {listas.length === 0 && <p className="muted">No tenés listas todavía. Creá una acá abajo.</p>}
+            {listas.map((l) => (
+              <button key={l.id} className="menu-linea" onClick={() => alternarEnLista(l, agregandoA)}>
+                <span className="check">{l.pistas.includes(agregandoA) ? "✓" : ""}</span>
+                <span className="nombre-lista">{l.nombre}</span>
+                <span className="cuenta-lista">{l.pistas.length}</span>
+              </button>
+            ))}
+            <form
+              className="menu-nueva"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const nombre = (e.currentTarget.elements.namedItem("nombre") as HTMLInputElement).value;
+                void crearListaYAgregar(nombre, agregandoA);
+                e.currentTarget.reset();
+              }}
+            >
+              <input name="nombre" placeholder="Nueva lista..." maxLength={40} aria-label="Nombre de la nueva lista" />
+              <button type="submit" className="add-lista">
+                Crear y agregar
+              </button>
+            </form>
+          </div>
+        </div>
       )}
 
       <audio
