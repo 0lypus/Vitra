@@ -77,6 +77,7 @@ frontend/public/demo/  # canción de ejemplo CC0 y su letra
 backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
   Clave.cs             # clave de acceso opcional (encabezado X-Clave)
   Modelos.cs           # entidades y marcas de sincronización
+  Migrations/          # esquema de la base (EF Core, se aplica al arrancar)
 backend/Vitra.Api.Tests/  # tests de .NET (xunit)
 docs/logo.png
 ```
@@ -111,7 +112,7 @@ Detalles de los endpoints en `backend/README.md`.
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
 - [x] Propagar borrados al sincronizar (tumbas con su propia marca, que compiten igual que las ediciones)
 - [x] Autenticación con clave para el backend (opcional, cabezal `X-Clave`); con `Vitra:Clave` vacío queda abierto para red local.
-- [ ] Migraciones de EF Core en vez de `EnsureCreated`
+- [x] Migraciones de EF Core en vez de `EnsureCreated` (la base se pone al día sola al arrancar)
 - [x] Exportar e importar la biblioteca en JSON
 
 ## Licencia

@@ -42,7 +42,16 @@ Las marcas `actualizado` se guardan como texto ISO UTC (`yyyy-MM-ddTHH:mm:ss.fff
 
 Los borrados no se eliminan: quedan como **tumbas** (`borrado: true`) con su propia marca `actualizado`, y `/api/sinc` las devuelve junto con lo vivo. Así el otro dispositivo se entera y borra en casa, pero si alguien editó esa canción después, la edición más nueva gana y la canción vuelve a existir. Las tumbas no arrastran metadatos: un borrado subido desde el cliente no pisa el título/autor que ya estaba guardado, y el servidor tampoco descarta los datos que tenía.
 
-Para arrancar de una versión anterior (sin la columna `Borrado`), borrá `backend/Vitra.Api/vitra.db`: se regenera solo al arrancar. Todavía no hay migraciones de EF Core.
+### Base de datos
+
+`vitra.db` (SQLite, al lado del proyecto) se crea y se actualiza sola al arrancar con las migraciones de EF Core; no hace falta tocar nada a mano. Para cambiar el esquema, editá `Modelos.cs` y generá una migración nueva:
+
+```powershell
+cd backend/Vitra.Api
+dotnet ef migrations add NombreDelCambio
+```
+
+Si venís de una versión vieja que creaba la base con `EnsureCreated` (no tiene la tabla de historial), borrá `vitra.db` una vez y se vuelve a crear con las migraciones.
 
 ## Seguridad
 
@@ -64,4 +73,4 @@ Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético) y la
 - [x] Botón de sincronizar en el frontend (subir cambios / bajar lo del servidor)
 - [x] Clave de acceso opcional para `/api/*` (encabezado `X-Clave`)
 - [x] Propagar los borrados (tumbas con `borrado: true` que compiten por `actualizado`)
-- [ ] Migraciones de EF Core en vez de `EnsureCreated`
+- [x] Migraciones de EF Core en vez de `EnsureCreated`
