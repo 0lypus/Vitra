@@ -46,6 +46,7 @@ app.MapGet("/api/sinc", async (VitraContext db) =>
 app.MapPut("/api/pistas", async (PistaDto dto, VitraContext db) =>
 {
     if (string.IsNullOrWhiteSpace(dto.Clave)) return Results.BadRequest("Falta la clave.");
+    var marca = Marcas.Normalizar(dto.Actualizado);
 
     var existente = await db.Pistas.FirstOrDefaultAsync(p => p.Clave == dto.Clave);
     if (existente is null)
@@ -59,10 +60,10 @@ app.MapPut("/api/pistas", async (PistaDto dto, VitraContext db) =>
             Duracion = dto.Duracion,
             Favorito = dto.Favorito,
             Letra = dto.Letra,
-            Actualizado = dto.Actualizado,
+            Actualizado = marca,
         });
     }
-    else if (dto.Actualizado >= existente.Actualizado)
+    else if (string.CompareOrdinal(marca, existente.Actualizado) >= 0)
     {
         existente.Titulo = dto.Titulo;
         existente.Artista = dto.Artista;
@@ -70,7 +71,7 @@ app.MapPut("/api/pistas", async (PistaDto dto, VitraContext db) =>
         existente.Duracion = dto.Duracion;
         existente.Favorito = dto.Favorito;
         existente.Letra = dto.Letra;
-        existente.Actualizado = dto.Actualizado;
+        existente.Actualizado = marca;
     }
     await db.SaveChangesAsync();
     return Results.Ok();
@@ -87,6 +88,7 @@ app.MapDelete("/api/pistas/{clave}", async (string clave, VitraContext db) =>
 app.MapPut("/api/listas", async (ListaDto dto, VitraContext db) =>
 {
     if (string.IsNullOrWhiteSpace(dto.Nombre)) return Results.BadRequest("Falta el nombre.");
+    var marca = Marcas.Normalizar(dto.Actualizado);
 
     var existente = await db.Listas.FirstOrDefaultAsync(l => l.Nombre == dto.Nombre);
     if (existente is null)
@@ -95,13 +97,13 @@ app.MapPut("/api/listas", async (ListaDto dto, VitraContext db) =>
         {
             Nombre = dto.Nombre.Trim(),
             Pistas = dto.Pistas,
-            Actualizado = dto.Actualizado,
+            Actualizado = marca,
         });
     }
-    else if (dto.Actualizado >= existente.Actualizado)
+    else if (string.CompareOrdinal(marca, existente.Actualizado) >= 0)
     {
         existente.Pistas = dto.Pistas;
-        existente.Actualizado = dto.Actualizado;
+        existente.Actualizado = marca;
     }
     await db.SaveChangesAsync();
     return Results.Ok();
