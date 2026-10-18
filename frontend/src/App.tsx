@@ -20,6 +20,7 @@ import {
 } from "./biblioteca";
 import { agregarAlFinal, limpiarCola, moverEnCola, quitarDeCola, reproducirAContinuacion, sacarSiguiente } from "./cola";
 import { parsearLrc, type LineaLetra } from "./letras";
+import { altoBarra, barrasLogaritmicas, valorBarra } from "./visualizador";
 import { aplicarRespaldo, crearRespaldo, leerRespaldo, nombreArchivoRespaldo } from "./respaldo";
 import { ErrorHttp, sincronizar } from "./sinc";
 import { formato, formatoTamano, normalizar } from "./utilidades";
@@ -921,20 +922,24 @@ export default function App() {
     const ctx2d = canvas?.getContext("2d");
     if (!canvas || !ctx2d) return;
 
+    // El degradado depende del alto del canvas, que ajustar() acaba de cambiar
+    let grad: CanvasGradient | undefined;
     const ajustar = () => {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
       canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+      const estilo = getComputedStyle(document.documentElement);
+      grad = ctx2d.createLinearGradient(0, canvas.height, 0, 0);
+      grad.addColorStop(0, estilo.getPropertyValue("--accent").trim() || "#c4a8ff");
+      grad.addColorStop(1, estilo.getPropertyValue("--gold").trim() || "#ffb86b");
     };
     ajustar();
     window.addEventListener("resize", ajustar);
 
-    const estilo = getComputedStyle(document.documentElement);
-    const grad = ctx2d.createLinearGradient(0, canvas.height, 0, 0);
-    grad.addColorStop(0, estilo.getPropertyValue("--accent").trim() || "#c4a8ff");
-    grad.addColorStop(1, estilo.getPropertyValue("--gold").trim() || "#ffb86b");
-
     const datos = new Uint8Array(analizadorRef.current?.frequencyBinCount ?? 128);
+    // Bins agrupados con escala logarítmica: así se mueve todo el ancho del
+    // canvas y no solo la franja izquierda de los graves
+    const rangos = barrasLogaritmicas(datos.length, 64);
     let ultimo = 0;
     let raf = 0;
     const dibujar = (ahora: number) => {
@@ -943,12 +948,12 @@ export default function App() {
       ultimo = ahora;
       analizadorRef.current?.getByteFrequencyData(datos);
       ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      ctx2d.fillStyle = grad;
-      const n = datos.length;
+      if (grad) ctx2d.fillStyle = grad;
+      const n = rangos.length;
       const ancho = canvas.width / n;
       const hueco = Math.min(2 * (window.devicePixelRatio || 1), ancho * 0.35);
       for (let i = 0; i < n; i++) {
-        const alto = Math.max(2, (datos[i] / 255) * canvas.height);
+        const alto = altoBarra(valorBarra(datos, rangos[i]), canvas.height);
         ctx2d.fillRect(i * ancho + hueco / 2, canvas.height - alto, ancho - hueco, alto);
       }
     };
