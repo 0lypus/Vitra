@@ -160,6 +160,16 @@ const IcLapiz = () => (
     <path d="M14.5 5.5l3 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
   </Icono>
 );
+const IcSubir = () => (
+  <Icono>
+    <path d="M6 14l6-6 6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+  </Icono>
+);
+const IcBajar = () => (
+  <Icono>
+    <path d="M6 10l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+  </Icono>
+);
 const IcOndas = () => (
   <Icono>
     <path
@@ -264,11 +274,13 @@ export default function App() {
   // La lista filtrada; la navegación (siguiente/anterior) recorre esta
   const textoBusqueda = normalizar(busqueda.trim());
   const lista = listaActiva !== null ? (listas.find((l) => l.id === listaActiva) ?? null) : null;
-  const idsLista = useMemo(() => new Set(lista?.pistas ?? []), [lista]);
-  const base = pistas.filter(
-    (p) =>
-      (!lista || idsLista.has(p.id)) && (!soloFavoritas || p.favorito),
-  );
+  const porId = useMemo(() => new Map(pistas.map((p) => [p.id, p])), [pistas]);
+  // Con lista activa se respeta el orden guardado (se puede reordenar a mano)
+  const base = lista
+    ? lista.pistas.map((id) => porId.get(id)).filter((p): p is Pista => p !== undefined)
+    : soloFavoritas
+      ? pistas.filter((p) => p.favorito)
+      : pistas;
   const pistasVisibles = textoBusqueda
     ? base.filter((p) => normalizar(p.titulo).includes(textoBusqueda) || normalizar(p.artista).includes(textoBusqueda))
     : base;
@@ -630,6 +642,22 @@ export default function App() {
       await guardarLista(nueva);
     } catch {
       setAviso("No se pudo renombrar la lista.");
+    }
+  }
+
+  /* Mueve una pista arriba o abajo dentro de la lista activa */
+  async function moverEnLista(l: Lista, pistaId: number, delta: number) {
+    const i = l.pistas.indexOf(pistaId);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= l.pistas.length) return;
+    const ids = [...l.pistas];
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const nueva: Lista = { ...l, pistas: ids };
+    setListas((prev) => prev.map((x) => (x.id === nueva.id ? nueva : x)));
+    try {
+      await guardarLista(nueva);
+    } catch {
+      setAviso("No se pudo reordenar la lista.");
     }
   }
 
@@ -1212,6 +1240,28 @@ export default function App() {
                   </span>
                   {p.duracion > 0 && <span className="dur">{formato(p.duracion)}</span>}
                 </button>
+                {lista && (
+                  <>
+                    <button
+                      className="btn-icon"
+                      onClick={() => moverEnLista(lista, p.id, -1)}
+                      disabled={lista.pistas[0] === p.id}
+                      aria-label={`Subir ${p.titulo} en la lista`}
+                      title="Subir en la lista"
+                    >
+                      <IcSubir />
+                    </button>
+                    <button
+                      className="btn-icon"
+                      onClick={() => moverEnLista(lista, p.id, 1)}
+                      disabled={lista.pistas[lista.pistas.length - 1] === p.id}
+                      aria-label={`Bajar ${p.titulo} en la lista`}
+                      title="Bajar en la lista"
+                    >
+                      <IcBajar />
+                    </button>
+                  </>
+                )}
                 <button
                   className="btn-icon"
                   onClick={() => setAgregandoA(p.id)}
