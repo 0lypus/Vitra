@@ -519,6 +519,7 @@ export default function App() {
             onClick={() => setAleatorio((a) => !a)}
             aria-label="Aleatorio"
             aria-pressed={aleatorio}
+            title={aleatorio ? "Aleatorio: activado" : "Aleatorio: apagado"}
           >
             <IcAleatorio />
           </button>
@@ -527,6 +528,7 @@ export default function App() {
             onClick={() => setRepetir((r) => (r === "nada" ? "todo" : r === "todo" ? "una" : "nada"))}
             aria-label={repetir === "nada" ? "Repetir apagado" : repetir === "todo" ? "Repetir todas" : "Repetir una"}
             aria-pressed={repetir !== "nada"}
+            title={repetir === "nada" ? "Repetir: apagado" : repetir === "todo" ? "Repetir: todas" : "Repetir: una"}
           >
             {repetir === "una" ? <IcRepetirUna /> : <IcRepetir />}
           </button>
