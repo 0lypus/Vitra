@@ -389,23 +389,32 @@ export default function App() {
   function siguiente(automatico = false) {
     const audio = audioRef.current;
     if (pistasVisibles.length === 0) return;
+
+    const reiniciar = () => {
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+    };
+
+    // Repetir una: cuando termina sola, vuelve a empezar la misma pista
+    if (automatico && repetir === "una") {
+      reiniciar();
+      return;
+    }
     if (pistasVisibles.length === 1) {
       // Una sola pista: al terminar sola solo se repite si repetir !== "nada"
-      if (!automatico || repetir !== "nada") {
-        if (audio) {
-          audio.currentTime = 0;
-          audio.play().catch(() => {});
-        }
-      }
+      if (!automatico || repetir === "todo") reiniciar();
       return;
     }
     // Fin de la biblioteca: si la repetición está apagada, no seguimos
     if (automatico && repetir === "nada" && indice === pistasVisibles.length - 1) return;
     let i: number;
     if (aleatorio) {
+      // Con menos de dos pistas elegirías siempre la misma y el bucle no terminaría
       do {
         i = Math.floor(Math.random() * pistasVisibles.length);
-      } while (i === indice);
+      } while (i === indice && pistasVisibles.length > 1);
     } else {
       i = indice >= 0 ? (indice + 1) % pistasVisibles.length : 0;
     }
@@ -423,7 +432,7 @@ export default function App() {
     if (aleatorio) {
       do {
         i = Math.floor(Math.random() * pistasVisibles.length);
-      } while (i === indice);
+      } while (i === indice && pistasVisibles.length > 1);
     } else {
       i = indice >= 0 ? (indice - 1 + pistasVisibles.length) % pistasVisibles.length : 0;
     }
