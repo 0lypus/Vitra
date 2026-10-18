@@ -480,6 +480,66 @@ export default function App() {
     else audio.pause();
   }
 
+  /* Mueve la reproducción delta segundos (atajos de teclado) */
+  function saltar(delta: number) {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration)) return;
+    audio.currentTime = Math.min(Math.max(0, audio.currentTime + delta), audio.duration);
+    setTiempo(audio.currentTime);
+  }
+
+  /* Atajos: espacio = play/pausa, ← → = 5 s (con Shift = pista), ↑ ↓ = volumen, S = aleatorio, R = repetir */
+  useEffect(() => {
+    function pulsar(e: KeyboardEvent) {
+      const destino = e.target as HTMLElement | null;
+      if (
+        destino &&
+        (destino.tagName === "INPUT" ||
+          destino.tagName === "TEXTAREA" ||
+          destino.tagName === "SELECT" ||
+          destino.isContentEditable)
+      ) {
+        return; // escribiendo en un campo: no interferimos
+      }
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          alternar();
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (e.shiftKey) siguiente();
+          else saltar(5);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (e.shiftKey) anterior();
+          else saltar(-5);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setVolumen((v) => Math.min(1, Math.round((v + 0.05) * 100) / 100));
+          setSilenciado(false);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          setVolumen((v) => Math.max(0, Math.round((v - 0.05) * 100) / 100));
+          break;
+        case "s":
+        case "S":
+          setAleatorio((a) => !a);
+          break;
+        case "r":
+        case "R":
+          setRepetir((r) => (r === "nada" ? "todo" : r === "todo" ? "una" : "nada"));
+          break;
+      }
+    }
+    window.addEventListener("keydown", pulsar);
+    return () => window.removeEventListener("keydown", pulsar);
+    // Se re-suscribe en cada render para usar siempre los últimos estados
+  });
+
   function siguiente(automatico = false) {
     const audio = audioRef.current;
     if (pistasVisibles.length === 0) return;
