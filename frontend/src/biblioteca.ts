@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { LineaLetra } from "./letras";
 
 export type Pista = {
   id: number;
@@ -9,9 +10,16 @@ export type Pista = {
   caratula?: Blob;
   /* Color dominante de la carátula en formato rgb(r, g, b), para el fondo dinámico */
   color?: string;
+  /* Letra sincronizada (.lrc) si la tiene */
+  letra?: LineaLetra[];
   nombreArchivo: string;
   tamano: number;
 };
+
+/* Nombre del archivo sin la extensión, para emparejar audio con su .lrc */
+export function baseNombre(nombre: string) {
+  return nombre.replace(/\.[^/.]+$/, "");
+}
 
 type NuevaPista = Omit<Pista, "id">;
 
@@ -177,6 +185,15 @@ export async function eliminarPista(id: number): Promise<void> {
   const tx = db.transaction(["pistas", "archivos"], "readwrite");
   await tx.objectStore("pistas").delete(id);
   await tx.objectStore("archivos").delete(id);
+  await tx.done;
+}
+
+/* Guarda (o reemplaza) la letra sincronizada de una pista ya importada */
+export async function guardarLetra(id: number, letra: LineaLetra[]): Promise<void> {
+  const db = await abrir();
+  const tx = db.transaction("pistas", "readwrite");
+  const pista = await tx.store.get(id);
+  if (pista) await tx.store.put({ ...pista, letra });
   await tx.done;
 }
 
