@@ -22,7 +22,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Sincronización opcional (v2)**: con el backend propio (`backend/Vitra.Api`) podés subir y bajar metadatos, favoritos, letras y listas para tener la misma biblioteca en varios dispositivos. El audio no se sube. El servidor puede exigir clave de acceso (`X-Clave`); la escribes una vez en el diálogo y Vitra la recuerda.
 - **Aleatorio y repetir** (todas / una), recordados entre sesiones.
 - **Buscador** por título o artista, sin importar mayúsculas ni tildes.
-- **Visualizador de audio** con Web Audio API (espectro de 128 barras a 30 fps), encendible/apagable.
+- **Visualizador de audio** con Web Audio API (espectro de 64 barras con escala logarítmica, a 30 fps), encendible/apagable. El reparto logarítmico hace que se mueva todo el ancho y no solo la franja de los graves.
 - **Biblioteca virtualizada**: la lista solo pinta las filas visibles, así que cientos de canciones no la traban.
 - **Atajos de teclado**: `Espacio` play/pausa · `←`/`→` ±5 s · `Shift+←`/`Shift+→` pista anterior/siguiente · `↑`/`↓` volumen · `S` aleatorio · `R` repetir.
 - **Arrastrar y soltar**: soltá archivos de audio o `.lrc` sobre la ventana para importarlos.
@@ -48,7 +48,7 @@ npm install
 npm run dev      # desarrollo con hot reload
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
-npm test         # tests (parser .lrc, utilidades, cola, sync, respaldo y clave)
+npm test         # tests (parser .lrc, utilidades, cola, visualizador, sync, respaldo y clave)
 ```
 
 El backend tiene sus propios tests (xunit):
@@ -71,6 +71,7 @@ frontend/src/
   respaldo.ts    # respaldo de la biblioteca en JSON
   sinc.ts        # cliente del backend (subir y bajar cambios)
   utilidades.ts  # formato de tiempo, tamaños y normalización de texto
+  visualizador.ts # reparto logarítmico del espectro en barras
   index.css      # estilos (vidrio, tema oscuro)
 frontend/public/demo/  # canción de ejemplo CC0 y su letra
 backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
