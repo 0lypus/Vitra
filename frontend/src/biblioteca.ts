@@ -24,6 +24,12 @@ export function baseNombre(nombre: string) {
   return nombre.replace(/\.[^/.]+$/, "");
 }
 
+/* Clave de emparejamiento entre dispositivos: "nombreArchivo|tamano".
+   Los ids de IndexedDB cambian en cada navegador, así que no sirven. */
+export function clavePista(p: Pick<Pista, "nombreArchivo" | "tamano">) {
+  return `${p.nombreArchivo}|${p.tamano}`;
+}
+
 type NuevaPista = Omit<Pista, "id">;
 
 /* Lista de reproducción: ids de pistas en el orden elegido */
@@ -36,16 +42,27 @@ export type Lista = {
 
 type NuevaLista = Omit<Lista, "id">;
 
+/* Borrado pendiente de sincronizar (tumba): lo que hay que contarle al
+   servidor. Vive hasta que el servidor confirma que lo tiene. */
+export type Borrado = {
+  tipo: "pista" | "lista";
+  /* Clave sincronizada: "nombreArchivo|tamano" para pistas, nombre para listas */
+  clave: string;
+  /* ISO UTC del borrado */
+  en: string;
+};
+
 interface VitraDB extends DBSchema {
   pistas: { key: number; value: Pista };
   archivos: { key: number; value: Blob };
   listas: { key: number; value: Lista };
+  borrados: { key: [string, string]; value: Borrado };
 }
 
 let dbPromise: Promise<IDBPDatabase<VitraDB>> | undefined;
 
 function abrir() {
-  dbPromise ??= openDB<VitraDB>("vitra", 2, {
+  dbPromise ??= openDB<VitraDB>("vitra", 3, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
         db.createObjectStore("pistas", { keyPath: "id", autoIncrement: true });
@@ -53,6 +70,9 @@ function abrir() {
       }
       if (oldVersion < 2) {
         db.createObjectStore("listas", { keyPath: "id", autoIncrement: true });
+      }
+      if (oldVersion < 3) {
+        db.createObjectStore("borrados", { keyPath: ["tipo", "clave"] });
       }
     },
   });
@@ -198,9 +218,11 @@ export async function listarPistas(): Promise<Pista[]> {
 
 export async function guardarPista(nueva: NuevaPista, archivo: Blob): Promise<Pista> {
   const db = await abrir();
-  const tx = db.transaction(["pistas", "archivos"], "readwrite");
+  const tx = db.transaction(["pistas", "archivos", "borrados"], "readwrite");
   const id = await tx.objectStore("pistas").add(nueva as Pista);
   await tx.objectStore("archivos").put(archivo, id);
+  // Volver a importar el audio cancela su borrado pendiente, si lo hubiera
+  await tx.objectStore("borrados").delete(["pista", clavePista(nueva)]);
   await tx.done;
   return { ...nueva, id };
 }
@@ -209,11 +231,18 @@ export async function obtenerArchivo(id: number): Promise<Blob | undefined> {
   return (await abrir()).get("archivos", id);
 }
 
-export async function eliminarPista(id: number): Promise<void> {
+/* Borra una pista y su archivo. Con "tumba" deja un registro del borrado para
+   que el servidor se entere al sincronizar; se omite cuando el borrado viene
+   del propio servidor, porque ahí ya está registrado. */
+export async function eliminarPista(id: number, tumba = true): Promise<void> {
   const db = await abrir();
-  const tx = db.transaction(["pistas", "archivos"], "readwrite");
+  const tx = db.transaction(["pistas", "archivos", "borrados"], "readwrite");
+  const pista = await tx.objectStore("pistas").get(id);
   await tx.objectStore("pistas").delete(id);
   await tx.objectStore("archivos").delete(id);
+  if (tumba && pista) {
+    await tx.objectStore("borrados").put({ tipo: "pista", clave: clavePista(pista), en: new Date().toISOString() });
+  }
   await tx.done;
 }
 
@@ -278,8 +307,13 @@ export async function crearLista(
   actualizado = new Date().toISOString(),
 ): Promise<Lista> {
   const db = await abrir();
-  const nueva: NuevaLista = { nombre: nombre.trim(), pistas, actualizado };
-  const id = await db.add("listas", nueva as Lista);
+  const limpio = nombre.trim();
+  const tx = db.transaction(["listas", "borrados"], "readwrite");
+  const nueva: NuevaLista = { nombre: limpio, pistas, actualizado };
+  const id = await tx.objectStore("listas").add(nueva as Lista);
+  // Crear de nuevo una lista con ese nombre cancela su borrado pendiente
+  await tx.objectStore("borrados").delete(["lista", limpio]);
+  await tx.done;
   return { ...nueva, id };
 }
 
@@ -288,6 +322,22 @@ export async function guardarLista(lista: Lista, actualizado = new Date().toISOS
   await (await abrir()).put("listas", { ...lista, actualizado });
 }
 
-export async function eliminarLista(id: number): Promise<void> {
-  await (await abrir()).delete("listas", id);
+export async function eliminarLista(id: number, tumba = true): Promise<void> {
+  const db = await abrir();
+  const tx = db.transaction(["listas", "borrados"], "readwrite");
+  const lista = await tx.objectStore("listas").get(id);
+  await tx.objectStore("listas").delete(id);
+  if (tumba && lista) {
+    await tx.objectStore("borrados").put({ tipo: "lista", clave: lista.nombre, en: new Date().toISOString() });
+  }
+  await tx.done;
+}
+
+/* Borrados pendientes de contarle al servidor */
+export async function listarBorrados(): Promise<Borrado[]> {
+  return (await abrir()).getAll("borrados");
+}
+
+export async function eliminarBorrado(tipo: Borrado["tipo"], clave: string): Promise<void> {
+  await (await abrir()).delete("borrados", [tipo, clave]);
 }
