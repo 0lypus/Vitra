@@ -5,10 +5,27 @@
    el otro dispositivo primero hay que importar los mismos archivos de audio.
 
    Estrategia del merge: gana la versión con la marca "actualizado" más nueva
-   (ISO UTC). Los borrados todavía no se propagan. */
+   (ISO UTC). Los borrados todavía no se propagan.
+
+   Si el backend tiene clave configurada, se manda en el encabezado X-Clave. */
 
 import { actualizarPista, crearLista, guardarLista, listarListas, listarPistas, type Lista, type Pista } from "./biblioteca";
 import { parsearLrc, serializarLrc, type LineaLetra } from "./letras";
+
+/* Encabezado con el que viaja la clave del backend */
+export const ENCABEZADO_CLAVE = "X-Clave";
+
+/* Error con el código HTTP a mano, para poder distinguir "el servidor pide
+   clave" (401) de "no llegué al servidor" */
+export class ErrorHttp extends Error {
+  readonly status: number;
+
+  constructor(status: number, mensaje: string) {
+    super(mensaje);
+    this.name = "ErrorHttp";
+    this.status = status;
+  }
+}
 
 export type PistaSinc = {
   clave: string;
@@ -110,26 +127,34 @@ export function conDatosDeFuera(p: Pista, remota: PistaSinc): Pista {
   };
 }
 
-async function pedirInventario(base: string): Promise<Inventario> {
-  const r = await fetch(`${base}/api/sinc`);
-  if (!r.ok) throw new Error(`GET /api/sinc → ${r.status}`);
+/* Encabezados de una petición: la clave (si hay) y el tipo de cuerpo */
+function cabeceras(clave: string, conCuerpo: boolean): Record<string, string> | undefined {
+  const h: Record<string, string> = {};
+  if (clave.trim()) h[ENCABEZADO_CLAVE] = clave.trim();
+  if (conCuerpo) h["Content-Type"] = "application/json";
+  return Object.keys(h).length > 0 ? h : undefined;
+}
+
+async function pedirInventario(base: string, clave: string): Promise<Inventario> {
+  const r = await fetch(`${base}/api/sinc`, { headers: cabeceras(clave, false) });
+  if (!r.ok) throw new ErrorHttp(r.status, `GET /api/sinc → ${r.status}`);
   return (await r.json()) as Inventario;
 }
 
-async function enviar(base: string, ruta: string, metodo: "PUT" | "DELETE", cuerpo?: unknown) {
+async function enviar(base: string, ruta: string, metodo: "PUT" | "DELETE", cuerpo: unknown, clave: string) {
   const r = await fetch(`${base}${ruta}`, {
     method: metodo,
-    headers: cuerpo !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers: cabeceras(clave, cuerpo !== undefined),
     body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
   });
-  if (!r.ok) throw new Error(`${metodo} ${ruta} → ${r.status}`);
+  if (!r.ok) throw new ErrorHttp(r.status, `${metodo} ${ruta} → ${r.status}`);
 }
 
 /* Sincroniza el navegador con el servidor: sube lo local más nuevo y baja
    lo del servidor más nuevo. Lee y escribe IndexedDB directamente. */
-export async function sincronizar(servidor: string): Promise<ResultadoSync> {
+export async function sincronizar(servidor: string, clave = ""): Promise<ResultadoSync> {
   const base = servidor.trim().replace(/\/+$/, "");
-  const inventario = await pedirInventario(base);
+  const inventario = await pedirInventario(base, clave);
   const pistas = await listarPistas();
   const listas = await listarListas();
 
@@ -150,7 +175,7 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
   for (const p of pistas) {
     const remota = remotaPorClave.get(clavePista(p));
     if (!remota || masNueva(p.actualizado, remota.actualizado)) {
-      await enviar(base, "/api/pistas", "PUT", aPistaSinc(p));
+      await enviar(base, "/api/pistas", "PUT", aPistaSinc(p), clave);
       res.pistasSubidas++;
     }
   }
@@ -174,7 +199,7 @@ export async function sincronizar(servidor: string): Promise<ResultadoSync> {
   for (const l of listas) {
     const remota = remotaListaPorNombre.get(l.nombre);
     if (!remota || masNueva(l.actualizado, remota.actualizado)) {
-      await enviar(base, "/api/listas", "PUT", aListaSinc(l, porId));
+      await enviar(base, "/api/listas", "PUT", aListaSinc(l, porId), clave);
       res.listasSubidas++;
     }
   }
