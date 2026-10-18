@@ -144,6 +144,18 @@ body {
   display: none;
 }
 
+.botones {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.demo {
+  border-style: solid;
+  font-weight: 600;
+}
+
 .list {
   margin: 0;
   padding: 0;

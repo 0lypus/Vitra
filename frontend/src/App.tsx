@@ -343,10 +343,37 @@ export default function App() {
         </div>
       </section>
 
-      <label className="add glass" style={{ padding: "0.85rem" }}>
-        {procesando ? `Procesando ${procesando.hechas} de ${procesando.total}...` : "+ Agregar música"}
-        <input type="file" accept="audio/*" multiple onChange={agregar} disabled={!!procesando} />
-      </label>
+      <div className="botones">
+        <label className="add glass" style={{ padding: "0.85rem" }}>
+          {procesando ? `Procesando ${procesando.hechas} de ${procesando.total}...` : "+ Agregar música"}
+          <input type="file" accept="audio/*" multiple onChange={agregar} disabled={!!procesando} />
+        </label>
+        <button
+          className="add glass demo"
+          onClick={async () => {
+            const archivosDemo = ["demo1.mp3", "demo2.mp3", "demo3.mp3"];
+            const archivos: File[] = [];
+            for (const nombre of archivosDemo) {
+              try {
+                const res = await fetch(`/demo/${nombre}`);
+                if (res.ok) {
+                  const blob = await res.blob();
+                  archivos.push(new File([blob], nombre, { type: blob.type || "audio/mpeg" }));
+                }
+              } catch {}
+            }
+            if (archivos.length === 0) {
+              setAviso("No se encontraron canciones de ejemplo en /demo/");
+              return;
+            }
+            const event = { target: { files: archivos } } as unknown as ChangeEvent<HTMLInputElement>;
+            await agregar(event);
+          }}
+          disabled={!!procesando}
+        >
+          Cargar canciones de ejemplo
+        </button>
+      </div>
 
       {aviso && <p className="aviso">{aviso}</p>}
 
