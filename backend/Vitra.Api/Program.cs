@@ -23,9 +23,16 @@ if (claveApi.Length == 0) claveApi = (Environment.GetEnvironmentVariable("VITRA_
 builder.Services.AddDbContext<VitraContext>(opciones =>
     opciones.UseSqlite($"Data Source={builder.Environment.ContentRootPath}/vitra.db"));
 
-var builderCors = builder.Services.AddCors(opciones =>
+/* CORS: la app corre en localhost y, desde el celular, en la IP de la red, así
+   que se aceptan los orígenes de la red local. Con "Vitra:Origenes" (separados
+   por coma) se pueden sumar otros, por ejemplo si lo publicás atrás de un proxy. */
+var origenesExtra = (builder.Configuration["Vitra:Origenes"] ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+builder.Services.AddCors(opciones =>
     opciones.AddPolicy("frontend", p => p
-        .WithOrigins("http://localhost:5173", "https://localhost:5173")
+        .SetIsOriginAllowed(origen => Origenes.EsDeRedLocal(origen) || origenesExtra.Contains(origen))
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
@@ -52,6 +59,16 @@ using (var alcance = app.Services.CreateScope())
 
 app.UseCors("frontend");
 
+/* Ayuda para el celular: con qué dirección entrar (el backend tiene que estar
+   escuchando en la red: dotnet run --launch-profile red) */
+foreach (var ip in Origenes.DireccionesLocales())
+{
+    app.Logger.LogInformation(
+        "Red local: en el celular abrí http://{Ip}:5173 (la app) y en Sincronizar poné http://{Ip}:5041 (la API).",
+        ip,
+        ip);
+}
+
 /* Con clave configurada, los endpoints /api/* piden el encabezado X-Clave */
 if (claveApi.Length > 0)
 {
@@ -70,7 +87,7 @@ if (claveApi.Length > 0)
 else
 {
     app.Logger.LogWarning(
-        "Vitra API: no hay clave configurada, así que la API queda abierta. Definí \"Vitra:Clave\" en appsettings.json o la variable de entorno VITRA_CLAVE para protegerla.");
+        "Vitra API: no hay clave configurada, así que la API queda abierta. Definí \"Vitra:Clave\" en appsettings.json o la variable de entorno VITRA_CLAVE para protegerla. Si la vas a usar desde el celular por la red, conviene ponerle una.");
 }
 
 /* Comprobación de vida */
