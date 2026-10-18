@@ -1,0 +1,239 @@
+:root {
+  --bg1: #1a0a45;
+  --bg2: #3b1c94;
+  --glass: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --text: #f4f0ff;
+  --muted: #b9acdf;
+  --accent: #c4a8ff;
+  --gold: #ffb86b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--text);
+  background:
+    radial-gradient(900px 500px at 20% -10%, #5a2fd1 0%, transparent 60%),
+    linear-gradient(160deg, var(--bg1), var(--bg2));
+  background-attachment: fixed;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1rem max(3rem, env(safe-area-inset-bottom));
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.25rem;
+}
+
+.brand img {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.glass {
+  margin-bottom: 1rem;
+  padding: 1.25rem;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.now h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.seek {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1rem 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.seek input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.btn {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.2rem;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn-main {
+  width: 3.8rem;
+  height: 3.8rem;
+  color: #1a0a45;
+  background: linear-gradient(135deg, var(--accent), var(--gold));
+  border: none;
+}
+
+.add {
+  display: block;
+  width: 100%;
+  padding: 0.85rem;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px dashed var(--glass-border);
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.add:hover {
+  border-color: var(--accent);
+}
+
+.add input {
+  display: none;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.7rem 0.4rem;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  cursor: pointer;
+}
+
+.list li:last-child .track {
+  border-bottom: none;
+}
+
+.track.on {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.track span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 0.5rem 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+
+
+/* Íconos SVG */
+.btn svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  fill: currentColor;
+}
+
+.btn-main svg {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
+/* Volumen */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.volume .btn {
+  flex: none;
+  width: 2.3rem;
+  height: 2.3rem;
+}
+
+.volume .btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.volume input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+/* Número o ícono de la lista */
+.num {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.4rem;
+}
+
+.num svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
