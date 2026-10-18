@@ -8,6 +8,8 @@
   --accent: #c4a8ff;
   --gold: #ffb86b;
   color-scheme: dark;
+  /* Transición del tinte dinámico (lo pisa App.tsx con la carátula) */
+  transition: --pista-color 1.1s ease;
 }
 
 * {
@@ -25,6 +27,27 @@ body {
   background-attachment: fixed;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Tinte dinámico: el color de la carátula de la pista sonando.
+   @property permite que el color transicione en vez de cambiar de golpe. */
+@property --pista-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgb(59 28 148);
+}
+
+.fondo {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    850px 480px at 78% 8%,
+    var(--pista-color) 0%,
+    transparent 62%
+  );
+  opacity: 0.55;
 }
 
 .app {

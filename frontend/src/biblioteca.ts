@@ -7,6 +7,8 @@ export type Pista = {
   album: string;
   duracion: number;
   caratula?: Blob;
+  /* Color dominante de la carátula en formato rgb(r, g, b), para el fondo dinámico */
+  color?: string;
   nombreArchivo: string;
   tamano: number;
 };
@@ -48,6 +50,80 @@ async function reducirCaratula(original: Blob, max = 256): Promise<Blob | null> 
   }
 }
 
+/* Conversión RGB (0-255) a HSL (h 0-1, s 0-1, l 0-1) */
+export function rgbAHsl(r: number, g: number, b: number): [number, number, number] {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+  else if (max === gn) h = ((bn - rn) / d + 2) / 6;
+  else h = ((rn - gn) / d + 4) / 6;
+  return [h, s, l];
+}
+
+/* Conversión HSL (h 0-1, s 0-1, l 0-1) a RGB (0-255) */
+export function hslARgb(h: number, s: number, l: number): [number, number, number] {
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [
+    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  ];
+}
+
+/* Saca el color dominante de una carátula (grilla de 16x16) y lo deja vivo
+   para que se note como tinte sobre el fondo. Devuelve "rgb(r, g, b)" o null. */
+export async function extraerColor(blob: Blob): Promise<string | null> {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bmp.close();
+      return null;
+    }
+    ctx.drawImage(bmp, 0, 0, 16, 16);
+    bmp.close();
+    const data = ctx.getImageData(0, 0, 16, 16).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    const n = data.length / 4;
+    for (let i = 0; i < data.length; i += 4) {
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+    }
+    const [h, s, l] = rgbAHsl(r / n, g / n, b / n);
+    const [rr, gg, bb] = hslARgb(h, Math.max(0.5, s), 0.45 + Math.min(l, 1) * 0.25);
+    return `rgb(${rr}, ${gg}, ${bb})`;
+  } catch {
+    return null;
+  }
+}
+
 /* Lee las etiquetas del archivo (la librería se carga recién al agregar música) */
 export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
   const base = archivo.name.replace(/\.[^/.]+$/, "");
@@ -56,6 +132,7 @@ export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
   let album = "";
   let duracion = 0;
   let caratula: Blob | undefined;
+  let color: string | undefined;
 
   try {
     const { parseBlob, selectCover } = await import("music-metadata");
@@ -69,12 +146,13 @@ export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
     if (cover) {
       const original = new Blob([new Uint8Array(cover.data)], { type: cover.format });
       caratula = (await reducirCaratula(original)) ?? undefined;
+      if (caratula) color = (await extraerColor(caratula)) ?? undefined;
     }
   } catch {
     /* sin etiquetas legibles: queda el nombre del archivo */
   }
 
-  return { titulo, artista, album, duracion, caratula, nombreArchivo: archivo.name, tamano: archivo.size };
+  return { titulo, artista, album, duracion, caratula, color, nombreArchivo: archivo.name, tamano: archivo.size };
 }
 
 export async function listarPistas(): Promise<Pista[]> {

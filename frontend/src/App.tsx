@@ -355,8 +355,14 @@ export default function App() {
 
   const mudo = silenciado || volumen === 0;
 
+  // Pinta el fondo con el color dominante de la carátula de la pista actual
+  useEffect(() => {
+    document.documentElement.style.setProperty("--pista-color", pista?.color ?? "rgb(59, 28, 148)");
+  }, [pista?.color]);
+
   return (
     <main className="app">
+      <div className="fondo" aria-hidden="true" />
       <header className="brand">
         <img src="/pwa-192x192.png" alt="" />
         <h1>Vitra</h1>
