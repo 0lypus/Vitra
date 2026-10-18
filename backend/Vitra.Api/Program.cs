@@ -90,26 +90,38 @@ app.MapPut("/api/pistas", async (PistaDto dto, VitraContext db) =>
             Favorito = dto.Favorito,
             Letra = dto.Letra,
             Actualizado = marca,
+            Borrado = dto.Borrado,
         });
     }
     else if (string.CompareOrdinal(marca, existente.Actualizado) >= 0)
     {
-        existente.Titulo = dto.Titulo;
-        existente.Artista = dto.Artista;
-        existente.Album = dto.Album;
-        existente.Duracion = dto.Duracion;
-        existente.Favorito = dto.Favorito;
-        existente.Letra = dto.Letra;
+        // Un borrado no arrastra los metadatos: solo deja marcada la tumba
+        if (!dto.Borrado)
+        {
+            existente.Titulo = dto.Titulo;
+            existente.Artista = dto.Artista;
+            existente.Album = dto.Album;
+            existente.Duracion = dto.Duracion;
+            existente.Favorito = dto.Favorito;
+            existente.Letra = dto.Letra;
+        }
+        existente.Borrado = dto.Borrado;
         existente.Actualizado = marca;
     }
     await db.SaveChangesAsync();
     return Results.Ok();
 });
 
-/* Baja una pista por clave */
+/* Baja una pista por clave. No elimina la fila: deja una tumba (Borrado) con
+   la marca de ahora, así los otros dispositivos se enteran al sincronizar */
 app.MapDelete("/api/pistas/{clave}", async (string clave, VitraContext db) =>
 {
-    var filas = await db.Pistas.Where(p => p.Clave == clave).ExecuteDeleteAsync();
+    var marca = Marcas.Normalizar(null);
+    var filas = await db.Pistas
+        .Where(p => p.Clave == clave)
+        .ExecuteUpdateAsync(s => s
+            .SetProperty(p => p.Borrado, true)
+            .SetProperty(p => p.Actualizado, marca));
     return filas > 0 ? Results.Ok() : Results.NotFound();
 });
 
@@ -127,21 +139,28 @@ app.MapPut("/api/listas", async (ListaDto dto, VitraContext db) =>
             Nombre = dto.Nombre.Trim(),
             Pistas = dto.Pistas,
             Actualizado = marca,
+            Borrado = dto.Borrado,
         });
     }
     else if (string.CompareOrdinal(marca, existente.Actualizado) >= 0)
     {
-        existente.Pistas = dto.Pistas;
+        if (!dto.Borrado) existente.Pistas = dto.Pistas;
+        existente.Borrado = dto.Borrado;
         existente.Actualizado = marca;
     }
     await db.SaveChangesAsync();
     return Results.Ok();
 });
 
-/* Baja una lista por nombre */
+/* Baja una lista por nombre (también deja tumba) */
 app.MapDelete("/api/listas/{nombre}", async (string nombre, VitraContext db) =>
 {
-    var filas = await db.Listas.Where(l => l.Nombre == nombre).ExecuteDeleteAsync();
+    var marca = Marcas.Normalizar(null);
+    var filas = await db.Listas
+        .Where(l => l.Nombre == nombre)
+        .ExecuteUpdateAsync(s => s
+            .SetProperty(l => l.Borrado, true)
+            .SetProperty(l => l.Actualizado, marca));
     return filas > 0 ? Results.Ok() : Results.NotFound();
 });
 

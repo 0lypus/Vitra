@@ -46,6 +46,10 @@ public class PistaSinc
 
     /* Marca ISO UTC de la última modificación, para decidir qué gana */
     public string Actualizado { get; set; } = "";
+
+    /* true = tumba: la canción se borró. La fila no se elimina para poder
+       avisarle a los otros dispositivos; se compite por la marca "actualizado" */
+    public bool Borrado { get; set; }
 }
 
 public class ListaSinc
@@ -57,6 +61,9 @@ public class ListaSinc
     public required string Pistas { get; set; }
 
     public string Actualizado { get; set; } = "";
+
+    /* true = tumba: la lista se borró */
+    public bool Borrado { get; set; }
 }
 
 /* Cuerpos que acepta la API (sin el id numérico, que asigna el servidor) */
@@ -69,9 +76,11 @@ public record PistaDto(
     double Duracion,
     bool Favorito,
     string? Letra,
-    string? Actualizado);
+    string? Actualizado,
+    bool Borrado = false);
 
 public record ListaDto(
     string Nombre,
     string Pistas,
-    string? Actualizado);
+    string? Actualizado,
+    bool Borrado = false);
