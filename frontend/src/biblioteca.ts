@@ -15,6 +15,8 @@ export type Pista = {
   favorito?: boolean;
   nombreArchivo: string;
   tamano: number;
+  /* Última modificación (ISO UTC): decide qué versión gana al sincronizar */
+  actualizado?: string;
 };
 
 /* Nombre del archivo sin la extensión, para emparejar audio con su .lrc */
@@ -29,6 +31,7 @@ export type Lista = {
   id: number;
   nombre: string;
   pistas: number[];
+  actualizado?: string;
 };
 
 type NuevaLista = Omit<Lista, "id">;
@@ -176,7 +179,17 @@ export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
     /* sin etiquetas legibles: queda el nombre del archivo */
   }
 
-  return { titulo, artista, album, duracion, caratula, color, nombreArchivo: archivo.name, tamano: archivo.size };
+  return {
+    titulo,
+    artista,
+    album,
+    duracion,
+    caratula,
+    color,
+    nombreArchivo: archivo.name,
+    tamano: archivo.size,
+    actualizado: new Date().toISOString(),
+  };
 }
 
 export async function listarPistas(): Promise<Pista[]> {
@@ -209,7 +222,7 @@ export async function guardarLetra(id: number, letra: LineaLetra[]): Promise<voi
   const db = await abrir();
   const tx = db.transaction("pistas", "readwrite");
   const pista = await tx.store.get(id);
-  if (pista) await tx.store.put({ ...pista, letra });
+  if (pista) await tx.store.put({ ...pista, letra, actualizado: new Date().toISOString() });
   await tx.done;
 }
 
@@ -218,7 +231,7 @@ export async function alternarFavorito(id: number, favorito: boolean): Promise<v
   const db = await abrir();
   const tx = db.transaction("pistas", "readwrite");
   const pista = await tx.store.get(id);
-  if (pista) await tx.store.put({ ...pista, favorito });
+  if (pista) await tx.store.put({ ...pista, favorito, actualizado: new Date().toISOString() });
   await tx.done;
 }
 
@@ -227,8 +240,13 @@ export async function guardarMetadatos(id: number, cambios: Pick<Pista, "titulo"
   const db = await abrir();
   const tx = db.transaction("pistas", "readwrite");
   const pista = await tx.store.get(id);
-  if (pista) await tx.store.put({ ...pista, ...cambios });
+  if (pista) await tx.store.put({ ...pista, ...cambios, actualizado: new Date().toISOString() });
   await tx.done;
+}
+
+/* Reemplaza una pista entera (la usa la sincronización al bajar cambios del servidor) */
+export async function actualizarPista(pista: Pista): Promise<void> {
+  await (await abrir()).put("pistas", pista);
 }
 
 export async function espacioUsado(): Promise<number | null> {
@@ -254,15 +272,20 @@ export async function listarListas(): Promise<Lista[]> {
   return (await abrir()).getAll("listas");
 }
 
-export async function crearLista(nombre: string): Promise<Lista> {
+export async function crearLista(
+  nombre: string,
+  pistas: number[] = [],
+  actualizado = new Date().toISOString(),
+): Promise<Lista> {
   const db = await abrir();
-  const nueva: NuevaLista = { nombre: nombre.trim(), pistas: [] };
+  const nueva: NuevaLista = { nombre: nombre.trim(), pistas, actualizado };
   const id = await db.add("listas", nueva as Lista);
   return { ...nueva, id };
 }
 
-export async function guardarLista(lista: Lista): Promise<void> {
-  await (await abrir()).put("listas", lista);
+/* Guarda una lista; le estampa la marca de sincronización (o la que se pase a mano) */
+export async function guardarLista(lista: Lista, actualizado = new Date().toISOString()): Promise<void> {
+  await (await abrir()).put("listas", { ...lista, actualizado });
 }
 
 export async function eliminarLista(id: number): Promise<void> {
