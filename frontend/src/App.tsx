@@ -32,6 +32,35 @@ function volumenInicial() {
   return 0.8;
 }
 
+function aleatorioInicial() {
+  try {
+    return localStorage.getItem("vitra:aleatorio") === "1";
+  } catch {
+    /* sin acceso al almacenamiento */
+  }
+  return false;
+}
+
+type Repetir = "nada" | "todo" | "una";
+
+function repetirInicial(): Repetir {
+  try {
+    const v = localStorage.getItem("vitra:repetir");
+    if (v === "todo" || v === "una") return v;
+  } catch {
+    /* sin acceso al almacenamiento */
+  }
+  return "nada";
+}
+
+/* Quita tildes y pasa a minúsculas, para buscar sin importar mayúsculas ni acentos */
+function normalizar(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 /* Íconos SVG: se ven igual en todos los dispositivos */
 const Icono = ({ children }: { children: ReactNode }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -87,6 +116,38 @@ const IcBasura = () => (
     <path d="M6 9h12l-1 11H7L6 9z" />
   </Icono>
 );
+const IcAleatorio = () => (
+  <Icono>
+    <path d="M16 3h5v5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 20L21 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M21 16v5h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M15 15l6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M4 4l5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </Icono>
+);
+const IcRepetir = () => (
+  <Icono>
+    <path d="M17 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 11v-1a4 4 0 014-4h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M7 22l-4-4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 13v1a4 4 0 01-4 4H3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </Icono>
+);
+const IcRepetirUna = () => (
+  <Icono>
+    <path d="M17 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M3 11v-1a4 4 0 014-4h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M7 22l-4-4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M21 13v1a4 4 0 01-4 4H3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M11.3 9.8l1.2-.8v5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </Icono>
+);
+const IcLupa = () => (
+  <Icono>
+    <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+    <path d="M15.5 15.5L21 21" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </Icono>
+);
 
 /* Muestra una carátula; crea la URL al montarse y la libera al desmontarse */
 function Caratula({ blob, className }: { blob?: Blob; className: string }) {
@@ -125,9 +186,17 @@ export default function App() {
   const [procesando, setProcesando] = useState<{ hechas: number; total: number } | null>(null);
   const [aviso, setAviso] = useState("");
   const [espacio, setEspacio] = useState<number | null>(null);
+  const [aleatorio, setAleatorio] = useState(aleatorioInicial);
+  const [repetir, setRepetir] = useState<Repetir>(repetirInicial);
+  const [busqueda, setBusqueda] = useState("");
 
-  const indice = pistas.findIndex((p) => p.id === actualId);
-  const pista = indice >= 0 ? pistas[indice] : undefined;
+  // La lista filtrada por la búsqueda; la navegación (siguiente/anterior) recorre esta
+  const textoBusqueda = normalizar(busqueda.trim());
+  const pistasVisibles = textoBusqueda
+    ? pistas.filter((p) => normalizar(p.titulo).includes(textoBusqueda) || normalizar(p.artista).includes(textoBusqueda))
+    : pistas;
+  const indice = pistasVisibles.findIndex((p) => p.id === actualId);
+  const pista = pistas.find((p) => p.id === actualId);
 
   const refrescarEspacio = () => {
     espacioUsado().then(setEspacio);
@@ -176,6 +245,16 @@ export default function App() {
     }
   }, [volumen, silenciado]);
 
+  // Recuerda aleatorio y repetir para la próxima vez
+  useEffect(() => {
+    try {
+      localStorage.setItem("vitra:aleatorio", aleatorio ? "1" : "0");
+      localStorage.setItem("vitra:repetir", repetir);
+    } catch {
+      /* sin acceso al almacenamiento */
+    }
+  }, [aleatorio, repetir]);
+
   // Media Session API: controles en bloqueo, notificaciones y teclas multimedia
   useEffect(() => {
     if (!("mediaSession" in navigator) || !pista) return;
@@ -222,7 +301,7 @@ export default function App() {
     ms.setActionHandler("play", playHandler);
     ms.setActionHandler("pause", pauseHandler);
     ms.setActionHandler("previoustrack", anterior);
-    ms.setActionHandler("nexttrack", siguiente);
+    ms.setActionHandler("nexttrack", () => siguiente());
     ms.setActionHandler("seekto", (e: MediaSessionActionDetails) => {
       const a = audioRef.current;
       if (a && e.seekTime !== undefined && !Number.isNaN(e.seekTime)) {
@@ -247,7 +326,7 @@ export default function App() {
       ms.setActionHandler("nexttrack", null);
       ms.setActionHandler("seekto", null);
     };
-  }, [sonando, duracion, tiempo, pista]);
+  }, [sonando, duracion, tiempo, pista, aleatorio, repetir]);
 
   async function agregar(e: ChangeEvent<HTMLInputElement>) {
     const archivos = Array.from(e.target.files ?? []);
@@ -307,29 +386,48 @@ export default function App() {
     else audio.pause();
   }
 
-  function siguiente() {
+  function siguiente(automatico = false) {
     const audio = audioRef.current;
-    if (pistas.length === 0) return;
-    if (pistas.length === 1) {
-      if (audio) {
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+    if (pistasVisibles.length === 0) return;
+    if (pistasVisibles.length === 1) {
+      // Una sola pista: al terminar sola solo se repite si repetir !== "nada"
+      if (!automatico || repetir !== "nada") {
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
+        }
       }
       return;
     }
-    const i = indice >= 0 ? (indice + 1) % pistas.length : 0;
-    setActualId(pistas[i].id);
+    // Fin de la biblioteca: si la repetición está apagada, no seguimos
+    if (automatico && repetir === "nada" && indice === pistasVisibles.length - 1) return;
+    let i: number;
+    if (aleatorio) {
+      do {
+        i = Math.floor(Math.random() * pistasVisibles.length);
+      } while (i === indice);
+    } else {
+      i = indice >= 0 ? (indice + 1) % pistasVisibles.length : 0;
+    }
+    setActualId(pistasVisibles[i].id);
   }
 
   function anterior() {
     const audio = audioRef.current;
-    if (pistas.length === 0 || !audio) return;
-    if (audio.currentTime > 3 || pistas.length === 1) {
+    if (pistasVisibles.length === 0 || !audio) return;
+    if (audio.currentTime > 3 || pistasVisibles.length === 1) {
       audio.currentTime = 0;
       return;
     }
-    const i = indice >= 0 ? (indice - 1 + pistas.length) % pistas.length : 0;
-    setActualId(pistas[i].id);
+    let i: number;
+    if (aleatorio) {
+      do {
+        i = Math.floor(Math.random() * pistasVisibles.length);
+      } while (i === indice);
+    } else {
+      i = indice >= 0 ? (indice - 1 + pistasVisibles.length) % pistasVisibles.length : 0;
+    }
+    setActualId(pistasVisibles[i].id);
   }
 
   function buscar(e: ChangeEvent<HTMLInputElement>) {
@@ -401,8 +499,27 @@ export default function App() {
           <button className="btn btn-main" onClick={alternar} disabled={!pista} aria-label="Reproducir o pausar">
             {sonando ? <IcPausa /> : <IcPlay />}
           </button>
-          <button className="btn" onClick={siguiente} disabled={!pista} aria-label="Siguiente">
+          <button className="btn" onClick={() => siguiente()} disabled={!pista} aria-label="Siguiente">
             <IcSiguiente />
+          </button>
+        </div>
+
+        <div className="extras">
+          <button
+            className={`btn btn-mini ${aleatorio ? "activo" : ""}`}
+            onClick={() => setAleatorio((a) => !a)}
+            aria-label="Aleatorio"
+            aria-pressed={aleatorio}
+          >
+            <IcAleatorio />
+          </button>
+          <button
+            className={`btn btn-mini ${repetir !== "nada" ? "activo" : ""}`}
+            onClick={() => setRepetir((r) => (r === "nada" ? "todo" : r === "todo" ? "una" : "nada"))}
+            aria-label={repetir === "nada" ? "Repetir apagado" : repetir === "todo" ? "Repetir todas" : "Repetir una"}
+            aria-pressed={repetir !== "nada"}
+          >
+            {repetir === "una" ? <IcRepetirUna /> : <IcRepetir />}
           </button>
         </div>
 
@@ -457,13 +574,27 @@ export default function App() {
       {aviso && <p className="aviso">{aviso}</p>}
 
       <section className="glass">
+        {!cargando && pistas.length > 0 && (
+          <div className="buscador">
+            <IcLupa />
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por título o artista"
+              aria-label="Buscar canciones"
+            />
+          </div>
+        )}
         {cargando ? (
           <p className="empty">Cargando biblioteca...</p>
         ) : pistas.length === 0 ? (
           <p className="empty">Todavía no hay canciones. Agregá archivos de audio de tu dispositivo.</p>
+        ) : pistasVisibles.length === 0 ? (
+          <p className="empty">No hay canciones que coincidan con “{busqueda}”.</p>
         ) : (
           <ul className="list">
-            {pistas.map((p) => (
+            {pistasVisibles.map((p) => (
               <li key={p.id}>
                 <button className={`track ${p.id === actualId ? "on" : ""}`} onClick={() => setActualId(p.id)}>
                   <Caratula blob={p.caratula} className="mini" />
@@ -484,7 +615,9 @@ export default function App() {
 
       {pistas.length > 0 && (
         <p className="muted pie">
-          {pistas.length} {pistas.length === 1 ? "canción" : "canciones"}
+          {pistasVisibles.length === pistas.length
+            ? `${pistas.length} ${pistas.length === 1 ? "canción" : "canciones"}`
+            : `${pistasVisibles.length} de ${pistas.length} canciones`}
           {espacio !== null && ` · ${formatoTamano(espacio)} usados`}
         </p>
       )}
@@ -495,7 +628,7 @@ export default function App() {
         onPause={() => setSonando(false)}
         onTimeUpdate={(e) => setTiempo(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuracion(e.currentTarget.duration)}
-        onEnded={siguiente}
+        onEnded={() => siguiente(true)}
       />
     </main>
   );

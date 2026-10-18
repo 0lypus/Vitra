@@ -259,6 +259,69 @@ body {
   accent-color: var(--accent);
 }
 
+/* Aleatorio y repetir */
+.extras {
+  display: flex;
+  justify-content: center;
+  gap: 1.6rem;
+  margin-top: 0.9rem;
+}
+
+.btn-mini {
+  width: 2.4rem;
+  height: 2.4rem;
+  color: var(--muted);
+}
+
+.btn-mini svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.btn-mini.activo {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* Buscador de la biblioteca */
+.buscador {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+}
+
+.buscador:focus-within {
+  border-color: var(--accent);
+}
+
+.buscador svg {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: var(--muted);
+}
+
+.buscador input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.buscador input::placeholder {
+  color: var(--muted);
+}
+
 /* Número o ícono de la lista */
 .num {
   display: inline-grid;
