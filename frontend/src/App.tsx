@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import {
+  alternarFavorito,
   baseNombre,
   eliminarPista,
   espacioUsado,
@@ -119,6 +120,17 @@ const IcBasura = () => (
     <path d="M6 9h12l-1 11H7L6 9z" />
   </Icono>
 );
+const IcCorazon = ({ lleno }: { lleno: boolean }) => (
+  <Icono>
+    <path
+      d="M12 20.3l-1.3-1.2C5.5 14.5 2.7 12 2.7 8.8 2.7 6.1 4.8 4 7.4 4c1.6 0 3.1.8 4.1 2 1-1.2 2.5-2 4.1-2 2.6 0 4.7 2.1 4.7 4.8 0 3.2-2.8 5.7-8 10.3L12 20.3z"
+      fill={lleno ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    />
+  </Icono>
+);
 const IcAleatorio = () => (
   <Icono>
     <path d="M16 3h5v5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -192,16 +204,19 @@ export default function App() {
   const [aleatorio, setAleatorio] = useState(aleatorioInicial);
   const [repetir, setRepetir] = useState<Repetir>(repetirInicial);
   const [busqueda, setBusqueda] = useState("");
+  const [soloFavoritas, setSoloFavoritas] = useState(false);
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
 
   // La lista filtrada por la búsqueda; la navegación (siguiente/anterior) recorre esta
   const textoBusqueda = normalizar(busqueda.trim());
+  const base = soloFavoritas ? pistas.filter((p) => p.favorito) : pistas;
   const pistasVisibles = textoBusqueda
-    ? pistas.filter((p) => normalizar(p.titulo).includes(textoBusqueda) || normalizar(p.artista).includes(textoBusqueda))
-    : pistas;
+    ? base.filter((p) => normalizar(p.titulo).includes(textoBusqueda) || normalizar(p.artista).includes(textoBusqueda))
+    : base;
   const indice = pistasVisibles.findIndex((p) => p.id === actualId);
   const pista = pistas.find((p) => p.id === actualId);
+  const favoritasCount = useMemo(() => pistas.filter((p) => p.favorito).length, [pistas]);
 
   /* Índice de la línea de la letra que corresponde al tiempo actual (búsqueda binaria) */
   const idxLetra = useMemo(() => {
@@ -471,6 +486,16 @@ export default function App() {
       refrescarEspacio();
     } catch {
       setAviso("No se pudo quitar la canción.");
+    }
+  }
+
+  async function toggleFavorito(p: Pista) {
+    const nuevo = !p.favorito;
+    setPistas((prev) => prev.map((x) => (x.id === p.id ? { ...x, favorito: nuevo } : x)));
+    try {
+      await alternarFavorito(p.id, nuevo);
+    } catch {
+      setAviso("No se pudo marcar la canción como favorita.");
     }
   }
 
@@ -805,23 +830,45 @@ export default function App() {
 
       <section className="glass">
         {!cargando && pistas.length > 0 && (
-          <div className="buscador">
-            <IcLupa />
-            <input
-              type="search"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por título o artista"
-              aria-label="Buscar canciones"
-            />
-          </div>
+          <>
+            <div className="filtros">
+              <button
+                className={`chip ${!soloFavoritas ? "on" : ""}`}
+                onClick={() => setSoloFavoritas(false)}
+                aria-pressed={!soloFavoritas}
+              >
+                Todas ({pistas.length})
+              </button>
+              <button
+                className={`chip ${soloFavoritas ? "on" : ""}`}
+                onClick={() => setSoloFavoritas(true)}
+                aria-pressed={soloFavoritas}
+              >
+                Favoritas ({favoritasCount})
+              </button>
+            </div>
+            <div className="buscador">
+              <IcLupa />
+              <input
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por título o artista"
+                aria-label="Buscar canciones"
+              />
+            </div>
+          </>
         )}
         {cargando ? (
           <p className="empty">Cargando biblioteca...</p>
         ) : pistas.length === 0 ? (
           <p className="empty">Todavía no hay canciones. Agregá archivos de audio de tu dispositivo.</p>
         ) : pistasVisibles.length === 0 ? (
-          <p className="empty">No hay canciones que coincidan con “{busqueda}”.</p>
+          <p className="empty">
+            {soloFavoritas
+              ? "Todavía no marcaste ninguna favorita. Tocá el corazón de una canción."
+              : `No hay canciones que coincidan con “${busqueda}”.`}
+          </p>
         ) : (
           <ul className="list">
             {pistasVisibles.map((p) => (
@@ -833,6 +880,15 @@ export default function App() {
                     <span className="artista">{p.artista}</span>
                   </span>
                   {p.duracion > 0 && <span className="dur">{formato(p.duracion)}</span>}
+                </button>
+                <button
+                  className={`btn-icon ${p.favorito ? "fav" : ""}`}
+                  onClick={() => toggleFavorito(p)}
+                  aria-label={p.favorito ? `Quitar ${p.titulo} de favoritas` : `Marcar ${p.titulo} como favorita`}
+                  aria-pressed={!!p.favorito}
+                  title={p.favorito ? "Quitar de favoritas" : "Marcar como favorita"}
+                >
+                  <IcCorazon lleno={!!p.favorito} />
                 </button>
                 <button className="btn-icon" onClick={() => quitar(p)} aria-label={`Quitar ${p.titulo}`} title="Quitar de Vitra">
                   <IcBasura />

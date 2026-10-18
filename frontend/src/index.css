@@ -286,6 +286,37 @@ body {
 }
 
 /* Buscador de la biblioteca */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+
+.chip {
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.chip.on {
+  color: #1a0a45;
+  font-weight: 700;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
 .buscador {
   display: flex;
   align-items: center;
@@ -450,6 +481,14 @@ body {
 
 .btn-icon:hover {
   color: var(--text);
+}
+
+.btn-icon.fav {
+  color: var(--gold);
+}
+
+.btn-icon.fav:hover {
+  color: var(--gold);
 }
 
 .pie {

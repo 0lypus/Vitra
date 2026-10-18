@@ -12,6 +12,7 @@ export type Pista = {
   color?: string;
   /* Letra sincronizada (.lrc) si la tiene */
   letra?: LineaLetra[];
+  favorito?: boolean;
   nombreArchivo: string;
   tamano: number;
 };
@@ -194,6 +195,15 @@ export async function guardarLetra(id: number, letra: LineaLetra[]): Promise<voi
   const tx = db.transaction("pistas", "readwrite");
   const pista = await tx.store.get(id);
   if (pista) await tx.store.put({ ...pista, letra });
+  await tx.done;
+}
+
+/* Marca o desmarca una pista como favorita */
+export async function alternarFavorito(id: number, favorito: boolean): Promise<void> {
+  const db = await abrir();
+  const tx = db.transaction("pistas", "readwrite");
+  const pista = await tx.store.get(id);
+  if (pista) await tx.store.put({ ...pista, favorito });
   await tx.done;
 }
 
