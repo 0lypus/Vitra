@@ -22,7 +22,7 @@ import { agregarAlFinal, limpiarCola, moverEnCola, quitarDeCola, reproducirACont
 import { parsearLrc, type LineaLetra } from "./letras";
 import { altoBarra, barrasLogaritmicas, valorBarra } from "./visualizador";
 import { aplicarRespaldo, crearRespaldo, leerRespaldo, nombreArchivoRespaldo } from "./respaldo";
-import { ErrorHttp, sincronizar } from "./sinc";
+import { ErrorHttp, servidorSugerido, sincronizar } from "./sinc";
 import { formato, formatoTamano, normalizar } from "./utilidades";
 
 /* Altura fija (px) de cada fila de la biblioteca: permite virtualizar la lista */
@@ -70,11 +70,13 @@ function verVisualizadorInicial() {
 
 function servidorInicial() {
   try {
-    return localStorage.getItem("vitra:servidor") ?? "http://localhost:5041";
+    const guardado = localStorage.getItem("vitra:servidor");
+    if (guardado) return guardado;
   } catch {
     /* sin acceso al almacenamiento */
   }
-  return "http://localhost:5041";
+  // Sin nada guardado: en la compu localhost; desde el celular, la IP de la red
+  return servidorSugerido(window.location.hostname);
 }
 
 function claveInicial() {

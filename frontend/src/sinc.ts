@@ -87,6 +87,15 @@ export function masNueva(a: string | undefined, b: string | undefined): boolean 
   return (a ?? "") > (b ?? "");
 }
 
+/* Dirección sugerida del backend para el diálogo de Sincronizar. Si abriste la
+   app por la IP de la red (el celular), el servidor está en esa misma máquina;
+   en la compu es localhost. El puerto es el que usa el backend por defecto. */
+export function servidorSugerido(hostname: string, puerto = 5041): string {
+  const host = hostname.trim() || "localhost";
+  // Los literales IPv6 van entre corchetes dentro de una URL
+  return `http://${host.includes(":") ? `[${host}]` : host}:${puerto}`;
+}
+
 /* ¿Esta tumba local ya perdió contra lo que tiene el servidor? Vale cuando el
    servidor tiene algo (una versión viva o su propia tumba) igual de nuevo o
    más nuevo: en ese caso ya no hace falta subirla y se puede olvidar. */
