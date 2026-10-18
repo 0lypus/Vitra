@@ -176,6 +176,79 @@ export default function App() {
     }
   }, [volumen, silenciado]);
 
+  // Media Session API: controles en bloqueo, notificaciones y teclas multimedia
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !pista) return;
+    let artworkUrl: string | undefined;
+
+    const artwork: MediaImage[] = [];
+    if (pista.caratula) {
+      artworkUrl = URL.createObjectURL(pista.caratula);
+      artwork.push({ src: artworkUrl, sizes: "512x512", type: pista.caratula.type || "image/png" });
+    }
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: pista.titulo,
+        artist: pista.artista,
+        album: pista.album || "",
+        artwork,
+      });
+    } catch {
+      /* algunos navegadores pueden fallar */
+    }
+
+    return () => {
+      if (artworkUrl) {
+        URL.revokeObjectURL(artworkUrl);
+      }
+    };
+  }, [pista]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    ms.playbackState = sonando ? "playing" : "paused";
+
+    const playHandler = () => {
+      const a = audioRef.current;
+      if (a) a.play().catch(() => {});
+    };
+    const pauseHandler = () => {
+      const a = audioRef.current;
+      if (a) a.pause();
+    };
+
+    ms.setActionHandler("play", playHandler);
+    ms.setActionHandler("pause", pauseHandler);
+    ms.setActionHandler("previoustrack", anterior);
+    ms.setActionHandler("nexttrack", siguiente);
+    ms.setActionHandler("seekto", (e: MediaSessionActionDetails) => {
+      const a = audioRef.current;
+      if (a && e.seekTime !== undefined && !Number.isNaN(e.seekTime)) {
+        a.currentTime = e.seekTime;
+      }
+    });
+
+    try {
+      ms.setPositionState?.({
+        duration: duracion || 0,
+        playbackRate: 1,
+        position: tiempo,
+      });
+    } catch {
+      /* algunos navegadores no soportan esto */
+    }
+
+    return () => {
+      ms.setActionHandler("play", null);
+      ms.setActionHandler("pause", null);
+      ms.setActionHandler("previoustrack", null);
+      ms.setActionHandler("nexttrack", null);
+      ms.setActionHandler("seekto", null);
+    };
+  }, [sonando, duracion, tiempo, pista]);
+
   async function agregar(e: ChangeEvent<HTMLInputElement>) {
     const archivos = Array.from(e.target.files ?? []);
     e.target.value = "";
