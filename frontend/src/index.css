@@ -317,6 +317,72 @@ body {
   border-color: var(--gold);
 }
 
+.chip.nuevo {
+  border-style: dashed;
+}
+
+/* Chip de lista con su botón de eliminar */
+.grupo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.grupo-chip:hover {
+  border-color: var(--accent);
+}
+
+.grupo-chip.on {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.grupo-chip .chip {
+  padding-right: 0.35rem;
+  background: transparent;
+  border: none;
+}
+
+.grupo-chip .chip:hover {
+  border-color: transparent;
+}
+
+.grupo-chip.on .chip {
+  color: #1a0a45;
+}
+
+.q-chip {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.q-chip:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.grupo-chip.on .q-chip {
+  color: #1a0a45;
+}
+
+.grupo-chip.on .q-chip:hover {
+  background: rgba(0, 0, 0, 0.18);
+}
+
 .buscador {
   display: flex;
   align-items: center;

@@ -24,18 +24,33 @@ export function baseNombre(nombre: string) {
 
 type NuevaPista = Omit<Pista, "id">;
 
+/* Lista de reproducción: ids de pistas en el orden elegido */
+export type Lista = {
+  id: number;
+  nombre: string;
+  pistas: number[];
+};
+
+type NuevaLista = Omit<Lista, "id">;
+
 interface VitraDB extends DBSchema {
   pistas: { key: number; value: Pista };
   archivos: { key: number; value: Blob };
+  listas: { key: number; value: Lista };
 }
 
 let dbPromise: Promise<IDBPDatabase<VitraDB>> | undefined;
 
 function abrir() {
-  dbPromise ??= openDB<VitraDB>("vitra", 1, {
-    upgrade(db) {
-      db.createObjectStore("pistas", { keyPath: "id", autoIncrement: true });
-      db.createObjectStore("archivos");
+  dbPromise ??= openDB<VitraDB>("vitra", 2, {
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        db.createObjectStore("pistas", { keyPath: "id", autoIncrement: true });
+        db.createObjectStore("archivos");
+      }
+      if (oldVersion < 2) {
+        db.createObjectStore("listas", { keyPath: "id", autoIncrement: true });
+      }
     },
   });
   return dbPromise;
@@ -223,4 +238,24 @@ export function pedirAlmacenamientoPersistente() {
   } catch {
     /* no disponible */
   }
+}
+
+/* Listas de reproducción */
+export async function listarListas(): Promise<Lista[]> {
+  return (await abrir()).getAll("listas");
+}
+
+export async function crearLista(nombre: string): Promise<Lista> {
+  const db = await abrir();
+  const nueva: NuevaLista = { nombre: nombre.trim(), pistas: [] };
+  const id = await db.add("listas", nueva as Lista);
+  return { ...nueva, id };
+}
+
+export async function guardarLista(lista: Lista): Promise<void> {
+  await (await abrir()).put("listas", lista);
+}
+
+export async function eliminarLista(id: number): Promise<void> {
+  await (await abrir()).delete("listas", id);
 }

@@ -2,14 +2,18 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent,
 import {
   alternarFavorito,
   baseNombre,
+  crearLista,
+  eliminarLista,
   eliminarPista,
   espacioUsado,
   guardarLetra,
   guardarPista,
   leerMetadatos,
+  listarListas,
   listarPistas,
   obtenerArchivo,
   pedirAlmacenamientoPersistente,
+  type Lista,
   type Pista,
 } from "./biblioteca";
 import { parsearLrc, type LineaLetra } from "./letras";
@@ -205,12 +209,19 @@ export default function App() {
   const [repetir, setRepetir] = useState<Repetir>(repetirInicial);
   const [busqueda, setBusqueda] = useState("");
   const [soloFavoritas, setSoloFavoritas] = useState(false);
+  const [listas, setListas] = useState<Lista[]>([]);
+  const [listaActiva, setListaActiva] = useState<number | null>(null);
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
 
-  // La lista filtrada por la búsqueda; la navegación (siguiente/anterior) recorre esta
+  // La lista filtrada; la navegación (siguiente/anterior) recorre esta
   const textoBusqueda = normalizar(busqueda.trim());
-  const base = soloFavoritas ? pistas.filter((p) => p.favorito) : pistas;
+  const lista = listaActiva !== null ? (listas.find((l) => l.id === listaActiva) ?? null) : null;
+  const idsLista = useMemo(() => new Set(lista?.pistas ?? []), [lista]);
+  const base = pistas.filter(
+    (p) =>
+      (!lista || idsLista.has(p.id)) && (!soloFavoritas || p.favorito),
+  );
   const pistasVisibles = textoBusqueda
     ? base.filter((p) => normalizar(p.titulo).includes(textoBusqueda) || normalizar(p.artista).includes(textoBusqueda))
     : base;
@@ -259,6 +270,9 @@ export default function App() {
       .then(setPistas)
       .catch(() => setAviso("No se pudo abrir el almacenamiento del navegador."))
       .finally(() => setCargando(false));
+    listarListas()
+      .then(setListas)
+      .catch(() => setAviso("No se pudieron cargar las listas."));
     refrescarEspacio();
   }, []);
 
@@ -496,6 +510,33 @@ export default function App() {
       await alternarFavorito(p.id, nuevo);
     } catch {
       setAviso("No se pudo marcar la canción como favorita.");
+    }
+  }
+
+  function activarLista(id: number) {
+    setListaActiva((prev) => (prev === id ? null : id));
+    setSoloFavoritas(false);
+  }
+
+  async function nuevaLista() {
+    const nombre = window.prompt("Nombre de la nueva lista:");
+    if (!nombre?.trim()) return;
+    try {
+      const listaCreada = await crearLista(nombre);
+      setListas((prev) => [...prev, listaCreada]);
+    } catch {
+      setAviso("No se pudo crear la lista.");
+    }
+  }
+
+  async function borrarLista(l: Lista) {
+    if (!window.confirm(`¿Eliminar la lista “${l.nombre}”? Las canciones no se borran de Vitra.`)) return;
+    try {
+      await eliminarLista(l.id);
+      setListas((prev) => prev.filter((x) => x.id !== l.id));
+      if (listaActiva === l.id) setListaActiva(null);
+    } catch {
+      setAviso("No se pudo eliminar la lista.");
     }
   }
 
@@ -833,18 +874,47 @@ export default function App() {
           <>
             <div className="filtros">
               <button
-                className={`chip ${!soloFavoritas ? "on" : ""}`}
-                onClick={() => setSoloFavoritas(false)}
-                aria-pressed={!soloFavoritas}
+                className={`chip ${!soloFavoritas && listaActiva === null ? "on" : ""}`}
+                onClick={() => {
+                  setSoloFavoritas(false);
+                  setListaActiva(null);
+                }}
+                aria-pressed={!soloFavoritas && listaActiva === null}
               >
                 Todas ({pistas.length})
               </button>
               <button
                 className={`chip ${soloFavoritas ? "on" : ""}`}
-                onClick={() => setSoloFavoritas(true)}
+                onClick={() => {
+                  setSoloFavoritas(true);
+                  setListaActiva(null);
+                }}
                 aria-pressed={soloFavoritas}
               >
                 Favoritas ({favoritasCount})
+              </button>
+              {listas.map((l) => (
+                <span key={l.id} className={`grupo-chip ${listaActiva === l.id ? "on" : ""}`}>
+                  <button
+                    className="chip"
+                    onClick={() => activarLista(l.id)}
+                    aria-pressed={listaActiva === l.id}
+                    title={`Ver la lista ${l.nombre}`}
+                  >
+                    {l.nombre} ({l.pistas.length})
+                  </button>
+                  <button
+                    className="q-chip"
+                    onClick={() => borrarLista(l)}
+                    aria-label={`Eliminar la lista ${l.nombre}`}
+                    title="Eliminar lista"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <button className="chip nuevo" onClick={nuevaLista} title="Crear una lista nueva">
+                + Lista
               </button>
             </div>
             <div className="buscador">
@@ -865,9 +935,11 @@ export default function App() {
           <p className="empty">Todavía no hay canciones. Agregá archivos de audio de tu dispositivo.</p>
         ) : pistasVisibles.length === 0 ? (
           <p className="empty">
-            {soloFavoritas
-              ? "Todavía no marcaste ninguna favorita. Tocá el corazón de una canción."
-              : `No hay canciones que coincidan con “${busqueda}”.`}
+            {lista
+              ? `La lista “${lista.nombre}” todavía no tiene canciones.`
+              : soloFavoritas
+                ? "Todavía no marcaste ninguna favorita. Tocá el corazón de una canción."
+                : `No hay canciones que coincidan con “${busqueda}”.`}
           </p>
         ) : (
           <ul className="list">
