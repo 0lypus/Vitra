@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
+  baseNombre,
   eliminarPista,
   espacioUsado,
+  guardarLetra,
   guardarPista,
   leerMetadatos,
   listarPistas,
@@ -9,6 +11,7 @@ import {
   pedirAlmacenamientoPersistente,
   type Pista,
 } from "./biblioteca";
+import { parsearLrc, type LineaLetra } from "./letras";
 
 function formato(seg: number) {
   if (!Number.isFinite(seg)) return "0:00";
@@ -189,6 +192,7 @@ export default function App() {
   const [aleatorio, setAleatorio] = useState(aleatorioInicial);
   const [repetir, setRepetir] = useState<Repetir>(repetirInicial);
   const [busqueda, setBusqueda] = useState("");
+  const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
 
   // La lista filtrada por la búsqueda; la navegación (siguiente/anterior) recorre esta
   const textoBusqueda = normalizar(busqueda.trim());
@@ -197,6 +201,37 @@ export default function App() {
     : pistas;
   const indice = pistasVisibles.findIndex((p) => p.id === actualId);
   const pista = pistas.find((p) => p.id === actualId);
+
+  /* Índice de la línea de la letra que corresponde al tiempo actual (búsqueda binaria) */
+  const idxLetra = useMemo(() => {
+    const l = pista?.letra;
+    if (!l || l.length === 0) return -1;
+    let lo = 0;
+    let hi = l.length - 1;
+    let res = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (l[mid].t <= tiempo) {
+        res = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return res;
+  }, [pista?.letra, tiempo]);
+
+  // Centra la línea actual en el panel de letra mientras suena
+  useEffect(() => {
+    const cont = letraRef.current;
+    if (!cont || idxLetra < 0) return;
+    const linea = cont.children[idxLetra] as HTMLElement | undefined;
+    if (!linea) return;
+    cont.scrollTo({
+      top: linea.offsetTop - cont.clientHeight / 2 + linea.clientHeight / 2,
+      behavior: "smooth",
+    });
+  }, [idxLetra]);
 
   const refrescarEspacio = () => {
     espacioUsado().then(setEspacio);
@@ -217,6 +252,10 @@ export default function App() {
     if (!audio || actualId === null) return;
     let cancelado = false;
     let url: string | undefined;
+
+    // La pista nueva empieza de cero (evita que la barra y la letra muestren el tiempo viejo)
+    setTiempo(0);
+    setDuracion(0);
 
     obtenerArchivo(actualId).then((archivo) => {
       if (cancelado || !archivo) return;
@@ -328,35 +367,90 @@ export default function App() {
     };
   }, [sonando, duracion, tiempo, pista, aleatorio, repetir]);
 
+  /* Importa archivos de audio y letras .lrc (del input o de la demo) */
+  async function importarArchivos(entradas: File[]) {
+    if (entradas.length === 0) return;
+
+    // Lee los .lrc y los empareja con el audio por nombre de archivo (sin extensión)
+    const letras = new Map<string, LineaLetra[]>();
+    for (const archivo of entradas) {
+      if (!archivo.name.toLowerCase().endsWith(".lrc")) continue;
+      try {
+        const lineas = parsearLrc(await archivo.text());
+        if (lineas.length > 0) letras.set(normalizar(baseNombre(archivo.name)), lineas);
+      } catch {
+        /* .lrc ilegible */
+      }
+    }
+    const audios = entradas.filter((a) => !a.name.toLowerCase().endsWith(".lrc"));
+
+    const mensajes: string[] = [];
+
+    if (audios.length > 0) {
+      setAviso("");
+      setProcesando({ hechas: 0, total: audios.length });
+      const claves = new Set(pistas.map((p) => `${p.nombreArchivo}|${p.tamano}`));
+      let fallidas = 0;
+
+      for (const [i, archivo] of audios.entries()) {
+        const clave = `${archivo.name}|${archivo.size}`;
+        if (!claves.has(clave)) {
+          claves.add(clave);
+          try {
+            const nueva = await leerMetadatos(archivo);
+            const guardada = await guardarPista(
+              { ...nueva, letra: letras.get(normalizar(baseNombre(archivo.name))) },
+              archivo,
+            );
+            setPistas((prev) => [...prev, guardada]);
+          } catch {
+            fallidas++;
+          }
+        }
+        setProcesando({ hechas: i + 1, total: audios.length });
+      }
+
+      setProcesando(null);
+      if (fallidas > 0) mensajes.push(`No se pudieron guardar ${fallidas} archivo(s). ¿Falta espacio?`);
+      pedirAlmacenamientoPersistente();
+      refrescarEspacio();
+    }
+
+    // Aplica las letras a canciones que ya estaban en la biblioteca (o a las recién sumadas)
+    if (letras.size > 0) {
+      let aplicadas = 0;
+      let conLetraYa = 0;
+      for (const p of pistas) {
+        const l = letras.get(normalizar(baseNombre(p.nombreArchivo)));
+        if (!l) continue;
+        if (p.letra) {
+          conLetraYa++;
+          continue;
+        }
+        try {
+          await guardarLetra(p.id, l);
+          setPistas((prev) => prev.map((x) => (x.id === p.id ? { ...x, letra: l } : x)));
+          aplicadas++;
+        } catch {
+          /* sin acceso al almacenamiento */
+        }
+      }
+      if (aplicadas > 0) {
+        mensajes.push(`Letra aplicada a ${aplicadas} ${aplicadas === 1 ? "canción" : "canciones"}.`);
+      } else if (audios.length === 0) {
+        mensajes.push(
+          conLetraYa > 0 ? "Esas canciones ya tenían letra." : "No encontré ninguna canción que coincida con ese archivo .lrc.",
+        );
+      }
+    }
+
+    setAviso(mensajes.join(" "));
+  }
+
   async function agregar(e: ChangeEvent<HTMLInputElement>) {
     const archivos = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (archivos.length === 0) return;
-
-    setAviso("");
-    setProcesando({ hechas: 0, total: archivos.length });
-    const claves = new Set(pistas.map((p) => `${p.nombreArchivo}|${p.tamano}`));
-    let fallidas = 0;
-
-    for (const [i, archivo] of archivos.entries()) {
-      const clave = `${archivo.name}|${archivo.size}`;
-      if (!claves.has(clave)) {
-        claves.add(clave);
-        try {
-          const nueva = await leerMetadatos(archivo);
-          const guardada = await guardarPista(nueva, archivo);
-          setPistas((prev) => [...prev, guardada]);
-        } catch {
-          fallidas++;
-        }
-      }
-      setProcesando({ hechas: i + 1, total: archivos.length });
-    }
-
-    setProcesando(null);
-    if (fallidas > 0) setAviso(`No se pudieron guardar ${fallidas} archivo(s). ¿Falta espacio?`);
-    pedirAlmacenamientoPersistente();
-    refrescarEspacio();
+    await importarArchivos(archivos);
   }
 
   async function quitar(p: Pista) {
@@ -550,10 +644,34 @@ export default function App() {
         </div>
       </section>
 
+      {pista?.letra && pista.letra.length > 0 && (
+        <section className="glass letra" aria-label="Letra sincronizada">
+          <div className="letra-scroll" ref={letraRef}>
+            {pista.letra.map((l, i) => (
+              <button
+                key={`${l.t}-${i}`}
+                type="button"
+                className={`linea-letra${i === idxLetra ? " actual" : ""}`}
+                onClick={() => {
+                  const audio = audioRef.current;
+                  if (audio) {
+                    audio.currentTime = l.t;
+                    setTiempo(l.t);
+                  }
+                }}
+                title={`Ir a ${formato(l.t)}`}
+              >
+                {l.texto || "♪"}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="botones">
         <label className="add glass" style={{ padding: "0.85rem" }}>
           {procesando ? `Procesando ${procesando.hechas} de ${procesando.total}...` : "+ Agregar música"}
-          <input type="file" accept="audio/*" multiple onChange={agregar} disabled={!!procesando} />
+          <input type="file" accept="audio/*,.lrc" multiple onChange={agregar} disabled={!!procesando} />
         </label>
         <button
           className="add glass demo"
@@ -567,14 +685,19 @@ export default function App() {
                   const blob = await res.blob();
                   archivos.push(new File([blob], nombre, { type: blob.type || "audio/mpeg" }));
                 }
+                // Trae también la letra .lrc si existe junto al archivo de ejemplo
+                const base = nombre.replace(/\.mp3$/i, "");
+                const resLrc = await fetch(`/demo/${base}.lrc`);
+                if (resLrc.ok) {
+                  archivos.push(new File([await resLrc.blob()], `${base}.lrc`, { type: "text/plain" }));
+                }
               } catch {}
             }
-            if (archivos.length === 0) {
+            if (archivos.filter((a) => a.name.endsWith(".mp3")).length === 0) {
               setAviso("No se encontraron canciones de ejemplo en /demo/");
               return;
             }
-            const event = { target: { files: archivos } } as unknown as ChangeEvent<HTMLInputElement>;
-            await agregar(event);
+            await importarArchivos(archivos);
           }}
           disabled={!!procesando}
         >

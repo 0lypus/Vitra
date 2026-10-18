@@ -465,3 +465,42 @@ body {
   background: rgba(255, 184, 107, 0.12);
   border-radius: 12px;
 }
+
+/* Letra sincronizada (.lrc) */
+.letra-scroll {
+  position: relative;
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.25rem 0;
+  scrollbar-width: thin;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+}
+
+.linea-letra {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.25s, transform 0.25s, background 0.25s;
+}
+
+.linea-letra:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.linea-letra.actual {
+  color: var(--text);
+  font-weight: 700;
+  transform: scale(1.06);
+}
