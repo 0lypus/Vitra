@@ -167,6 +167,14 @@ body {
   display: none;
 }
 
+/* Ícono dentro de un botón de acción (por ejemplo, Sincronizar) */
+.add svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-right: 0.35rem;
+  vertical-align: -0.15rem;
+}
+
 .botones {
   display: flex;
   flex-direction: column;

@@ -19,6 +19,7 @@ import {
   type Pista,
 } from "./biblioteca";
 import { parsearLrc, type LineaLetra } from "./letras";
+import { sincronizar } from "./sinc";
 import { formato, formatoTamano, normalizar } from "./utilidades";
 
 /* Altura fija (px) de cada fila de la biblioteca: permite virtualizar la lista */
@@ -62,6 +63,15 @@ function verVisualizadorInicial() {
     /* sin acceso al almacenamiento */
   }
   return false;
+}
+
+function servidorInicial() {
+  try {
+    return localStorage.getItem("vitra:servidor") ?? "http://localhost:5041";
+  } catch {
+    /* sin acceso al almacenamiento */
+  }
+  return "http://localhost:5041";
 }
 
 /* Íconos SVG: se ven igual en todos los dispositivos */
@@ -149,6 +159,14 @@ const IcSubir = () => (
 const IcBajar = () => (
   <Icono>
     <path d="M6 10l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+  </Icono>
+);
+const IcSinc = () => (
+  <Icono>
+    <path d="M20 12a8 8 0 01-13.7 5.6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M4 12a8 8 0 0113.7-5.6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M3.5 16.5v-4h4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20.5 7.5v4h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </Icono>
 );
 const IcOndas = () => (
@@ -243,6 +261,9 @@ export default function App() {
   const [agregandoA, setAgregandoA] = useState<number | null>(null); // pista elegida en el diálogo "agregar a lista"
   const [editando, setEditando] = useState<Pista | null>(null); // pista en el diálogo "editar metadatos"
   const [borrador, setBorrador] = useState({ titulo: "", artista: "", album: "" });
+  const [servidor, setServidor] = useState(servidorInicial); // URL del backend de sincronización
+  const [verSync, setVerSync] = useState(false); // diálogo de sincronización abierto
+  const [sincronizando, setSincronizando] = useState(false);
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
   const listaRef = useRef<HTMLUListElement>(null); // contenedor scrolleable de la biblioteca
@@ -691,16 +712,60 @@ export default function App() {
 
   // Escape cierra los diálogos abiertos
   useEffect(() => {
-    if (agregandoA === null && editando === null) return;
+    if (agregandoA === null && editando === null && !verSync) return;
     const tecla = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setAgregandoA(null);
         setEditando(null);
+        setVerSync(false);
       }
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [agregandoA, editando]);
+  }, [agregandoA, editando, verSync]);
+
+  // Recuerda la URL del backend para la próxima vez
+  useEffect(() => {
+    try {
+      localStorage.setItem("vitra:servidor", servidor);
+    } catch {
+      /* sin acceso al almacenamiento */
+    }
+  }, [servidor]);
+
+  /* Sube y baja metadatos, favoritos, letras y listas con el backend */
+  async function sincronizarAhora() {
+    if (!servidor.trim()) return;
+    setSincronizando(true);
+    setAviso("");
+    try {
+      const r = await sincronizar(servidor);
+      // Recarga el estado desde IndexedDB, que ya quedó actualizado
+      setPistas(await listarPistas());
+      setListas(await listarListas());
+      const partes = [
+        r.pistasSubidas > 0 && `${r.pistasSubidas} ${r.pistasSubidas === 1 ? "canción subida" : "canciones subidas"}`,
+        r.pistasActualizadas > 0 &&
+          `${r.pistasActualizadas} ${r.pistasActualizadas === 1 ? "actualizada" : "actualizadas"} desde el servidor`,
+        r.listasSubidas > 0 && `${r.listasSubidas} ${r.listasSubidas === 1 ? "lista subida" : "listas subidas"}`,
+        r.listasActualizadas > 0 &&
+          `${r.listasActualizadas} ${r.listasActualizadas === 1 ? "lista actualizada" : "listas actualizadas"}`,
+      ].filter(Boolean);
+      if (partes.length === 0) partes.push("todo estaba al día");
+      setAviso(`Sincronización lista: ${partes.join(", ")}.`);
+      if (r.sinAudio > 0) {
+        setAviso(
+          `Sincronización lista: ${partes.join(", ")}. El servidor conoce ${r.sinAudio} ${
+            r.sinAudio === 1 ? "canción que no tenés" : "canciones que no tenés"
+          }: importá esos archivos para completarlas.`,
+        );
+      }
+    } catch {
+      setAviso("No se pudo sincronizar. ¿Está corriendo el backend y bien escrita la URL?");
+    } finally {
+      setSincronizando(false);
+    }
+  }
 
   /* Conecta el audio al analizador de Web Audio.
      Hay que llamarlo con un gesto del usuario: el contexto arranca suspendido. */
@@ -1114,6 +1179,15 @@ export default function App() {
         >
           Cargar canciones de ejemplo
         </button>
+        <button
+          className="add glass demo"
+          onClick={() => setVerSync(true)}
+          disabled={sincronizando}
+          title="Subir y bajar tus datos con el backend"
+        >
+          <IcSinc />
+          {sincronizando ? "Sincronizando..." : "Sincronizar"}
+        </button>
       </div>
 
       {aviso && <p className="aviso">{aviso}</p>}
@@ -1379,6 +1453,43 @@ export default function App() {
               Guardar
             </button>
           </form>
+        </div>
+      )}
+
+      {verSync && (
+        <div className="modal-fondo" onClick={() => setVerSync(false)}>
+          <div
+            className="modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sincronizar con el backend"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-titulo">
+              <h3>Sincronizar</h3>
+              <button className="btn-icon" onClick={() => setVerSync(false)} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+            <label className="campo-editar">
+              Dirección del servidor
+              <input
+                value={servidor}
+                onChange={(e) => setServidor(e.target.value)}
+                placeholder="http://localhost:5041"
+                autoFocus
+                spellCheck={false}
+              />
+            </label>
+            <p className="muted pie-edicion">
+              Sube metadatos, favoritos, letras y listas; y baja lo que esté más nuevo en el servidor. Los archivos de
+              audio no se suben: importá los mismos archivos en el otro dispositivo para que se emparejen por nombre y
+              tamaño.
+            </p>
+            <button className="add-lista" onClick={() => void sincronizarAhora()} disabled={sincronizando || !servidor.trim()}>
+              {sincronizando ? "Sincronizando..." : "Sincronizar ahora"}
+            </button>
+          </div>
         </div>
       )}
 
