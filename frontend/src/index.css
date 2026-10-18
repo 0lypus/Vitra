@@ -335,6 +335,11 @@ body {
 .btn-icon {
   flex: none;
   color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  border-radius: 10px;
 }
 
 .btn-icon svg {
