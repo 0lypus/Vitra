@@ -91,7 +91,13 @@ dotnet run       # API en http://localhost:5041
 dotnet run --launch-profile red   # además escucha en la red (para el celular)
 ```
 
-Arranca abierta; si le ponés una clave (`"Vitra:Clave"` en `appsettings.json`, `--Vitra:Clave=...` o la variable `VITRA_CLAVE`), los endpoints `/api/*` piden el encabezado `X-Clave`, que el diálogo de Sincronizar manda por vos.
+Arranca abierta; si le ponés una clave, los endpoints `/api/*` piden el encabezado `X-Clave` (lo manda el diálogo de Sincronizar por vos). La forma recomendada es guardarla fuera del repo, desde `backend/Vitra.Api`:
+
+```powershell
+dotnet user-secrets set "Vitra:Clave" "mi-clave-secreta"
+```
+
+También sirve `"Vitra:Clave"` en `appsettings.json`, `--Vitra:Clave=...` al arrancar o la variable `VITRA_CLAVE`.
 
 Detalles de los endpoints en `backend/README.md`.
 

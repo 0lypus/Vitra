@@ -13,7 +13,18 @@ dotnet run
 
 Levanta en `http://localhost:5041` (el puerto está en `Properties/launchSettings.json`; se puede cambiar con `dotnet run --urls http://localhost:5199`). Crea `vitra.db` (SQLite) automáticamente la primera vez.
 
-Para exigir clave de acceso, poné `"Vitra:Clave"` en `appsettings.json`, o pasala al arrancar sin tocar el archivo:
+### Clave de acceso
+
+Con una clave configurada, todos los endpoints `/api/*` piden el encabezado `X-Clave` (`/salud` queda siempre abierto). El cliente la escribe una vez en el diálogo **Sincronizar** y la manda en cada pedido.
+
+La forma recomendada es guardarla fuera del repo, con *user secrets* (va a tu perfil de usuario, no al proyecto):
+
+```powershell
+cd backend/Vitra.Api
+dotnet user-secrets set "Vitra:Clave" "mi-clave-secreta"
+```
+
+También sirve `"Vitra:Clave"` en `appsettings.json`, o pasarla al arrancar sin tocar archivos:
 
 ```powershell
 # PowerShell
@@ -23,7 +34,9 @@ dotnet run
 dotnet run -- --Vitra:Clave=mi-clave-secreta
 ```
 
-El cliente la escribe una vez en el diálogo **Sincronizar** y la manda en cada pedido.
+Ojo: los *user secrets* los carga .NET solo en entorno **Development**, que es el que usan los perfiles de `dotnet run`. Si arrancás con `--no-launch-profile` (o con `ASPNETCORE_ENVIRONMENT=Production`), usá `appsettings.json` o `VITRA_CLAVE`.
+
+Si le pusiste clave y el diálogo de Sincronizar avisa que el servidor la pide (error 401), escribila ahí: queda guardada en ese navegador.
 
 ### Desde el celular (red local)
 
