@@ -25,6 +25,15 @@ dotnet run -- --Vitra:Clave=mi-clave-secreta
 
 El cliente la escribe una vez en el diálogo **Sincronizar** y la manda en cada pedido.
 
+### Desde el celular (red local)
+
+```powershell
+cd backend/Vitra.Api
+dotnet run --launch-profile red   # escucha en 0.0.0.0:5041, o sea en toda la red
+```
+
+Al arrancar te dice con qué dirección entrar desde el teléfono (por ejemplo `http://192.168.1.20:5041`); la app te la sugiere sola en el diálogo de Sincronizar. Sin clave, cualquier aparato de la red puede leer tu biblioteca: si lo vas a abrir a la red, conviene configurarla.
+
 ## Endpoints
 
 | Método | Ruta | Qué hace |
@@ -56,7 +65,7 @@ Si venís de una versión vieja que creaba la base con `EnsureCreated` (no tiene
 ## Seguridad
 
 - **Clave opcional**: con `Vitra:Clave` vacío la API queda **abierta** (sirve para red local). En cuanto le pongas una clave, todos los endpoints `/api/*` responden `401` salvo que manden el encabezado `X-Clave` con ese valor. El comparador es de tiempo constante y el encabezado está permitido en el CORS. `/salud` queda siempre abierto, para poder chequear que el servidor responde.
-- CORS permite solo `http://localhost:5173` (el dev server del frontend).
+- CORS: acepta los orígenes de la red local (localhost, IPv4 privadas 10.x, 172.16-31.x, 192.168.x y las IPv6 locales) más los que sumes en `Vitra:Origenes` (separados por coma), por si lo publicás atrás de un proxy. Así la app funciona tanto en la compu como desde el celular por la IP de la máquina.
 - Aun con clave, sigue pensado para red local o servidor propio detrás de tu propio proxy: no lo expongas a internet tal cual.
 
 ## Tests
@@ -66,7 +75,7 @@ cd backend/Vitra.Api.Tests
 dotnet test
 ```
 
-Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético) y la clave de acceso.
+Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético), los orígenes permitidos por el CORS y la clave de acceso.
 
 ## Pendientes
 

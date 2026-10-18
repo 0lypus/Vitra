@@ -37,7 +37,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 3. **Listas**: el botón `+` de cada fila abre el diálogo para agregar o quitar la canción de una lista (y crear listas desde ahí). Los chips arriba de la biblioteca filtran por “Todas”, “Favoritas” o cada lista.
 4. **Reproducción**: clic en cualquier canción; la navegación (anterior/siguiente) recorre lo que esté filtrado en ese momento.
 5. **Cola**: el botón de cola de cada fila (el ▶ con rayitas) abre el diálogo para poner esa canción “a continuación” o “al final”. El chip “Cola” abre el panel, donde se reordena con ↑/↓, se quitan canciones o se vacía. Lo encolado suena antes que el orden normal (biblioteca, favoritas o lista activa); la cola es de la sesión: al cerrar la app se pierde.
-6. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Podés poner una clave en el diálogo si el backend la exige. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen. Si borrás una canción o una lista, el borrado se propaga al otro lado (si alguien la editó después, gana la edición más nueva y vuelve a aparecer).
+6. **Sincronizar** (opcional): levantá el backend (`cd backend/Vitra.Api; dotnet run`) y tocá “Sincronizar”. Podés poner una clave en el diálogo si el backend la exige. Sube lo que tengas más nuevo y baja lo del servidor: metadatos, favoritos, letras y listas. El audio no se sube, así que en el otro dispositivo importá los mismos archivos y después sincronizá para que se emparejen. Si borrás una canción o una lista, el borrado se propaga al otro lado (si alguien la editó después, gana la edición más nueva y vuelve a aparecer). Desde el celular: en la compu corré `npm run dev:red` y el backend con `dotnet run --launch-profile red`; en el teléfono abrí la dirección de red que te muestran los dos (por ejemplo `http://192.168.1.20:5173`) y el diálogo te va a sugerir sola la API de esa misma máquina.
 7. **Respaldo**: “Respaldo” → “Descargar respaldo” baja un `.json` con esos mismos datos. Si algún día el navegador limpia el almacenamiento (o querés mudarte de equipo), agregá de nuevo los archivos de audio y tocá “Importar respaldo...”: se vuelven a aplicar favoritos, letras, títulos y listas sobre las canciones que coincidan por nombre y tamaño.
 
 ## Desarrollo
@@ -46,6 +46,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 cd frontend
 npm install
 npm run dev      # desarrollo con hot reload
+npm run dev:red  # igual, pero escuchando en la red (para el celular)
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
 npm test         # tests (parser .lrc, utilidades, cola, visualizador, sync y borrados, respaldo y clave)
@@ -55,7 +56,7 @@ El backend tiene sus propios tests (xunit):
 
 ```powershell
 cd backend/Vitra.Api.Tests
-dotnet test     # 21 tests (marcas de sincronización y clave de acceso)
+dotnet test     # 43 tests (marcas de sincronización, clave de acceso y orígenes permitidos)
 ```
 
 Stack: React + TypeScript + Vite, `idb` (IndexedDB), `music-metadata` y `vite-plugin-pwa`. Sin frameworks de UI: CSS a mano con variables y `backdrop-filter`. Los tests usan `vitest` y, para los que tocan IndexedDB, `fake-indexeddb` (solo dependencia de desarrollo).
@@ -87,6 +88,7 @@ El backend es opcional: Vitra funciona entero sin él. Para levantarlo:
 ```powershell
 cd backend/Vitra.Api
 dotnet run       # API en http://localhost:5041
+dotnet run --launch-profile red   # además escucha en la red (para el celular)
 ```
 
 Arranca abierta; si le ponés una clave (`"Vitra:Clave"` en `appsettings.json`, `--Vitra:Clave=...` o la variable `VITRA_CLAVE`), los endpoints `/api/*` piden el encabezado `X-Clave`, que el diálogo de Sincronizar manda por vos.
@@ -98,6 +100,7 @@ Detalles de los endpoints en `backend/README.md`.
 - **iPhone/iPad (Safari)**: la app no puede controlar el volumen del sistema, puede limpiar el almacenamiento si el dispositivo está con poco espacio (por eso pide persistencia) y el primer `play()` requiere un toque del usuario.
 - **Firefox** no implementa `backdrop-filter` igual que Chrome; la interfaz funciona, se ve un poco distinta.
 - Los archivos importados no se pueden recuperar si el navegador borra los datos del sitio; Vitra pide almacenamiento persistente para reducir ese riesgo. Si tenés un respaldo en JSON, volvés a agregar los audios e importás el archivo: recuperás metadatos, favoritos, letras y listas.
+- **Sincronizar desde el celular**: anda por la red local, pero el service worker (offline e instalable) solo se habilita en HTTPS o en localhost, así que por HTTP en la red el teléfono usa la app como página web nomás. El backend tiene que estar escuchando en la red (`dotnet run --launch-profile red`) y, si no le ponés clave, cualquier aparato de la red puede leer tu biblioteca.
 
 ## Canciones de ejemplo
 
