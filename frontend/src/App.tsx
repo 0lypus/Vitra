@@ -8,6 +8,7 @@ import {
   espacioUsado,
   guardarLetra,
   guardarLista,
+  guardarMetadatos,
   guardarPista,
   leerMetadatos,
   listarListas,
@@ -153,6 +154,12 @@ const IcMas = () => (
     <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
   </Icono>
 );
+const IcLapiz = () => (
+  <Icono>
+    <path d="M4 20l4-1 10-10-3-3L5 16l-1 4z" />
+    <path d="M14.5 5.5l3 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icono>
+);
 const IcOndas = () => (
   <Icono>
     <path
@@ -243,6 +250,8 @@ export default function App() {
   const [listas, setListas] = useState<Lista[]>([]);
   const [listaActiva, setListaActiva] = useState<number | null>(null);
   const [agregandoA, setAgregandoA] = useState<number | null>(null); // pista elegida en el diálogo "agregar a lista"
+  const [editando, setEditando] = useState<Pista | null>(null); // pista en el diálogo "editar metadatos"
+  const [borrador, setBorrador] = useState({ titulo: "", artista: "", album: "" });
   const [sobre, setSobre] = useState(false); // hay archivos arrastrados sobre la ventana
   const letraRef = useRef<HTMLDivElement>(null); // contenedor de la letra, para auto-centrar
   const listaRef = useRef<HTMLUListElement>(null); // contenedor scrolleable de la biblioteca
@@ -612,6 +621,18 @@ export default function App() {
     }
   }
 
+  async function renombrarLista(l: Lista) {
+    const nombre = window.prompt("Nuevo nombre de la lista:", l.nombre);
+    if (!nombre?.trim() || nombre.trim() === l.nombre) return;
+    const nueva: Lista = { ...l, nombre: nombre.trim() };
+    setListas((prev) => prev.map((x) => (x.id === l.id ? nueva : x)));
+    try {
+      await guardarLista(nueva);
+    } catch {
+      setAviso("No se pudo renombrar la lista.");
+    }
+  }
+
   /* Quita o agrega una pista a una lista (el diálogo queda abierto para varias listas) */
   async function alternarEnLista(l: Lista, pistaId: number) {
     const nueva: Lista = {
@@ -638,15 +659,39 @@ export default function App() {
     }
   }
 
-  // Escape cierra el diálogo "agregar a una lista"
+  function abrirEdicion(p: Pista) {
+    setBorrador({ titulo: p.titulo, artista: p.artista, album: p.album });
+    setEditando(p);
+  }
+
+  async function guardarEdicion() {
+    if (!editando) return;
+    const cambios = {
+      titulo: borrador.titulo.trim() || editando.nombreArchivo,
+      artista: borrador.artista.trim() || "Artista desconocido",
+      album: borrador.album.trim(),
+    };
+    setPistas((prev) => prev.map((x) => (x.id === editando.id ? { ...x, ...cambios } : x)));
+    setEditando(null);
+    try {
+      await guardarMetadatos(editando.id, cambios);
+    } catch {
+      setAviso("No se pudieron guardar los cambios.");
+    }
+  }
+
+  // Escape cierra los diálogos abiertos
   useEffect(() => {
-    if (agregandoA === null) return;
+    if (agregandoA === null && editando === null) return;
     const tecla = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAgregandoA(null);
+      if (e.key === "Escape") {
+        setAgregandoA(null);
+        setEditando(null);
+      }
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [agregandoA]);
+  }, [agregandoA, editando]);
 
   /* Conecta el audio al analizador de Web Audio.
      Hay que llamarlo con un gesto del usuario: el contexto arranca suspendido. */
@@ -1100,6 +1145,14 @@ export default function App() {
                   </button>
                   <button
                     className="q-chip"
+                    onClick={() => renombrarLista(l)}
+                    aria-label={`Renombrar la lista ${l.nombre}`}
+                    title="Renombrar lista"
+                  >
+                    <IcLapiz />
+                  </button>
+                  <button
+                    className="q-chip"
                     onClick={() => borrarLista(l)}
                     aria-label={`Eliminar la lista ${l.nombre}`}
                     title="Eliminar lista"
@@ -1168,6 +1221,14 @@ export default function App() {
                   <IcMas />
                 </button>
                 <button
+                  className="btn-icon"
+                  onClick={() => abrirEdicion(p)}
+                  aria-label={`Editar los datos de ${p.titulo}`}
+                  title="Editar datos"
+                >
+                  <IcLapiz />
+                </button>
+                <button
                   className={`btn-icon ${p.favorito ? "fav" : ""}`}
                   onClick={() => toggleFavorito(p)}
                   aria-label={p.favorito ? `Quitar ${p.titulo} de favoritas` : `Marcar ${p.titulo} como favorita`}
@@ -1233,6 +1294,60 @@ export default function App() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {editando && (
+        <div className="modal-fondo" onClick={() => setEditando(null)}>
+          <form
+            className="modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Editar datos de la canción"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void guardarEdicion();
+            }}
+          >
+            <div className="modal-titulo">
+              <h3>Editar datos</h3>
+              <button type="button" className="btn-icon" onClick={() => setEditando(null)} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+            <label className="campo-editar">
+              Título
+              <input
+                value={borrador.titulo}
+                onChange={(e) => setBorrador((b) => ({ ...b, titulo: e.target.value }))}
+                maxLength={200}
+                autoFocus
+              />
+            </label>
+            <label className="campo-editar">
+              Artista
+              <input
+                value={borrador.artista}
+                onChange={(e) => setBorrador((b) => ({ ...b, artista: e.target.value }))}
+                maxLength={200}
+              />
+            </label>
+            <label className="campo-editar">
+              Álbum
+              <input
+                value={borrador.album}
+                onChange={(e) => setBorrador((b) => ({ ...b, album: e.target.value }))}
+                maxLength={200}
+              />
+            </label>
+            <p className="muted pie-edicion">
+              Se guarda solo en Vitra; el archivo de audio no se toca. Nombre del archivo: {editando.nombreArchivo}
+            </p>
+            <button type="submit" className="add-lista">
+              Guardar
+            </button>
+          </form>
         </div>
       )}
 

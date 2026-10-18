@@ -222,6 +222,15 @@ export async function alternarFavorito(id: number, favorito: boolean): Promise<v
   await tx.done;
 }
 
+/* Guarda los metadatos editados a mano (título, artista, álbum) */
+export async function guardarMetadatos(id: number, cambios: Pick<Pista, "titulo" | "artista" | "album">): Promise<void> {
+  const db = await abrir();
+  const tx = db.transaction("pistas", "readwrite");
+  const pista = await tx.store.get(id);
+  if (pista) await tx.store.put({ ...pista, ...cambios });
+  await tx.done;
+}
+
 export async function espacioUsado(): Promise<number | null> {
   try {
     const estimado = await navigator.storage?.estimate?.();
