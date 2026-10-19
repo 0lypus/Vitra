@@ -119,17 +119,29 @@ Queda `Vitra.exe` (≈ 1,4 MB) y, al lado, la carpeta `web/` con la app (por eso
 
 ### Android (`.apk`)
 
-El proyecto está en `frontend/android` (**Capacitor**). Para compilarlo hace falta **JDK 21** y el **Android SDK** (lo más simple es instalar [Android Studio](https://developer.android.com/studio), que trae los dos). Una vez instalado, con el celular conectado por USB o sin él:
+El proyecto está en `frontend/android` (**Capacitor**). Ya quedó instalado lo que hace falta para compilarlo en este equipo:
+
+- **JDK 21** en `%LOCALAPPDATA%\Android\jdk-21`
+- **Android SDK** (platform-tools, android-36, build-tools 36.0.0) en `%LOCALAPPDATA%\Android\Sdk`
+- las variables de usuario `JAVA_HOME` y `ANDROID_HOME` apuntando a cada uno
+
+Con eso, para armar el APK:
 
 ```powershell
 cd frontend
-npm run build:app
-npx cap sync android
+npm run build:app        # build de la app web (sin service worker)
+npx cap sync android     # copia el build adentro del proyecto Android
 cd android
-.\gradlew assembleDebug
+.\gradlew assembleDebug  # compila el APK de depuración
 ```
 
-El APK queda en `android\app\build\outputs\apk\debug\app-debug.apk` y se instala con `adb install -r app\build\outputs\apk\debug\app-debug.apk`. Ese es un APK **de prueba** (firma de depuración): sirve para tu teléfono, pero para repartirlo a otras personas hay que firmarlo con una clave propia (`assembleRelease` + keystore).
+Queda en `android\app\build\outputs\apk\debug\app-debug.apk`. Con el celular conectado por USB y la depuración activada, se instala así:
+
+```powershell
+& "$env:ANDROID_HOME\platform-tools\adb.exe" install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+Ese es un APK **de prueba** (firma de depuración): sirve para tu teléfono, pero para repartirlo a otras personas hay que firmarlo con una clave propia (`assembleRelease` + keystore).
 
 El ícono hoy es el genérico de Capacitor; se puede reemplazar por el de Vitra con `npx @capacitor/assets generate` a partir de un PNG.
 
