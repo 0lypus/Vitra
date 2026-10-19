@@ -99,7 +99,7 @@ docs/prueba-ui.ps1      # prueba de la interfaz (28 comprobaciones, Chrome headl
 
 ## Apps de escritorio y Android
 
-Vitra también se puede empaquetar como aplicación sin reescribir nada: es la misma app web adentro de una ventana (escritorio) o de un WebView (Android). Primero va el build pensado para empaquetar, que no lleva service worker (los archivos viajan dentro del paquete, así que no hace falta):
+Vitra también se puede empaquetar como aplicación sin reescribir nada: es la misma app web adentro de una ventana (escritorio) o de un WebView (Android). Los paquetes ya armados están en [Releases](https://github.com/0lypus/Vitra/releases); acá va cómo se generan. Primero, el build pensado para empaquetar, que no lleva service worker (los archivos viajan dentro del paquete, así que no hace falta):
 
 ```powershell
 cd frontend
@@ -209,9 +209,9 @@ Vitra está **completa y en uso**: no le falta nada del plan original.
 - **Tests:** 101 del frontend (Vitest) y 51 del backend (xunit), todos en verde. El build y el lint no tiran errores.
 - **Sin cuentas, sin servidores de terceros, sin rastreo:** la biblioteca vive en tu equipo (IndexedDB).
 - **Licencia:** el código es **MIT** (ver [Licencia](#licencia)); las canciones de ejemplo son CC0.
-- **Se corre desde el repo** (todavía sin releases publicadas).
+- **Descargable:** hay un [Release](https://github.com/0lypus/Vitra/releases) con la app de PC (`.exe`) y la de Android (`.apk`), además de correrse desde el repo.
 
-Lo hecho, en detalle, está en el [Roadmap](#roadmap). Lo que falta es **distribuirla como aplicación**: de escritorio (`.exe`) y de Android (`.apk`), en vez de abrirla en el navegador.
+Lo hecho, en detalle, está en el [Roadmap](#roadmap). También se empaqueta como aplicación de escritorio y de Android (ver [Apps de escritorio y Android](#apps-de-escritorio-y-android)).
 
 ## Roadmap
 
@@ -227,8 +227,8 @@ Lo hecho, en detalle, está en el [Roadmap](#roadmap). Lo que falta es **distrib
 - [x] Exportar e importar la biblioteca en JSON
 - [x] Medir y documentar el consumo de RAM (`docs/medir-ram.ps1`)
 - [x] Tres canciones de ejemplo CC0 (Kevin MacLeod, Chopin y un himno de Wikimedia)
-- [ ] Empaquetar como aplicación de escritorio (`.exe`)
-- [ ] Empaquetar como aplicación de Android (`.apk`)
+- [x] Empaquetar como aplicación de escritorio (`.exe`)
+- [x] Empaquetar como aplicación de Android (`.apk`)
 
 ## Licencia
 
