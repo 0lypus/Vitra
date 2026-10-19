@@ -8,7 +8,7 @@
   Reproductor de música liviano con estética de vidrio. PWA para PC y móvil.
 </p>
 
-Vitra es una Progressive Web App que reproduce la música que ya tenés en tu dispositivo: importás los archivos, quedan guardados en el navegador (IndexedDB) y listo. Sin cuentas, sin servidores, sin rastreo: toda tu biblioteca vive en tu equipo.
+Vitra es una Progressive Web App que reproduce la música que ya tenés en tu dispositivo: importás los archivos, quedan guardados en el navegador (IndexedDB) y listo. Sin cuentas, sin servidores, sin rastreo: toda tu biblioteca vive en tu equipo. No envuelve YouTube ni ningún servicio de streaming: si el archivo no está en tu equipo, Vitra no lo busca.
 
 ## Características
 
@@ -155,4 +155,6 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 
 ## Licencia
 
-El código de Vitra no tiene licencia todavía; la música de ejemplo es CC0 (ver arriba).
+El código de Vitra es **MIT** (Copyright © 2026 Palacios Damian): podés usarlo, modificarlo, publicarlo y venderlo, dejando el aviso de copyright. El texto completo está en [`LICENSE`](LICENSE).
+
+La licencia cubre el código, no la música. Las tres canciones de ejemplo son **CC0 1.0** (dominio público) y su atribución está en [`frontend/public/demo/README.md`](frontend/public/demo/README.md).
