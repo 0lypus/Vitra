@@ -537,18 +537,25 @@ export default function App() {
       setProcesando({ hechas: 0, total: audios.length });
       const claves = new Set(pistas.map((p) => `${p.nombreArchivo}|${p.tamano}`));
       let fallidas = 0;
+      const ilegibles: string[] = [];
 
       for (const [i, archivo] of audios.entries()) {
         const clave = `${archivo.name}|${archivo.size}`;
         if (!claves.has(clave)) {
           claves.add(clave);
           try {
-            const nueva = await leerMetadatos(archivo);
-            const guardada = await guardarPista(
-              { ...nueva, letra: letras.get(normalizar(baseNombre(archivo.name))) },
-              archivo,
-            );
-            setPistas((prev) => [...prev, guardada]);
+            const { pista, legible } = await leerMetadatos(archivo);
+            if (!legible) {
+              // No se pudo leer ni el contenedor: casi seguro no es audio (o está
+              // dañado). No lo sumo para no dejar una "canción" de 0:00 que no suena.
+              ilegibles.push(archivo.name);
+            } else {
+              const guardada = await guardarPista(
+                { ...pista, letra: letras.get(normalizar(baseNombre(archivo.name))) },
+                archivo,
+              );
+              setPistas((prev) => [...prev, guardada]);
+            }
           } catch {
             fallidas++;
           }
@@ -558,6 +565,14 @@ export default function App() {
 
       setProcesando(null);
       if (fallidas > 0) mensajes.push(`No se pudieron guardar ${fallidas} archivo(s). ¿Falta espacio?`);
+      if (ilegibles.length > 0) {
+        const nombres = ilegibles.slice(0, 3).join(", ") + (ilegibles.length > 3 ? ` y ${ilegibles.length - 3} más` : "");
+        mensajes.push(
+          ilegibles.length === 1
+            ? `No sumé 1 archivo que no parece audio (${nombres}).`
+            : `No sumé ${ilegibles.length} archivos que no parecen audio (${nombres}).`,
+        );
+      }
       pedirAlmacenamientoPersistente();
       refrescarEspacio();
     }

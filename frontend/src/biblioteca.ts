@@ -171,8 +171,13 @@ export async function extraerColor(blob: Blob): Promise<string | null> {
   }
 }
 
-/* Lee las etiquetas del archivo (la librería se carga recién al agregar música) */
-export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
+/** Lo que se guarda de un archivo nuevo, y si se pudo leer como audio. */
+export type Metadatos = { pista: NuevaPista; legible: boolean };
+
+/* Lee las etiquetas del archivo (la librería se carga recién al agregar música).
+   `legible` en false quiere decir que no se pudo leer ni el contenedor: casi
+   siempre es un archivo dañado o que no es audio. */
+export async function leerMetadatos(archivo: File): Promise<Metadatos> {
   const base = archivo.name.replace(/\.[^/.]+$/, "");
   let titulo = base;
   let artista = "Artista desconocido";
@@ -180,10 +185,14 @@ export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
   let duracion = 0;
   let caratula: Blob | undefined;
   let color: string | undefined;
+  let legible = false;
 
   try {
     const { parseBlob, selectCover } = await import("music-metadata");
     const meta = await parseBlob(archivo);
+    // Ojo: music-metadata no tira error con la basura, devuelve un resultado
+    // vacío. Si no reconoció ningún contenedor ni códec, no es audio.
+    legible = Boolean(meta.format.container || meta.format.codec || meta.format.duration || meta.format.sampleRate);
     titulo = meta.common.title?.trim() || base;
     artista = meta.common.artist?.trim() || artista;
     album = meta.common.album?.trim() || "";
@@ -200,15 +209,18 @@ export async function leerMetadatos(archivo: File): Promise<NuevaPista> {
   }
 
   return {
-    titulo,
-    artista,
-    album,
-    duracion,
-    caratula,
-    color,
-    nombreArchivo: archivo.name,
-    tamano: archivo.size,
-    actualizado: new Date().toISOString(),
+    pista: {
+      titulo,
+      artista,
+      album,
+      duracion,
+      caratula,
+      color,
+      nombreArchivo: archivo.name,
+      tamano: archivo.size,
+      actualizado: new Date().toISOString(),
+    },
+    legible,
   };
 }
 
