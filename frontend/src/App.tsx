@@ -1418,6 +1418,34 @@ export default function App() {
                 aria-label="Buscar canciones"
               />
             </div>
+            {soloFavoritas && pistasVisibles.length > 0 && (
+              (() => {
+                const destacada =
+                  pistasVisibles.find((p) => p.id === actualId) ?? pistasVisibles[0];
+                return (
+                  <div className="hero-favoritas">
+                    <button
+                      onClick={() => {
+                        prepararAnalizador();
+                        setActualId(destacada.id);
+                      }}
+                      aria-label={`Reproducir ${destacada.titulo}`}
+                      title="Reproducir"
+                    >
+                      <Caratula blob={destacada.caratula} className="favorita" />
+                    </button>
+                    <div className="info">
+                      <span className="titulo" title={destacada.titulo}>
+                        {destacada.titulo}
+                      </span>
+                      <span className="artista" title={destacada.artista}>
+                        {destacada.artista}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
           </>
         )}
         {cargando ? (
@@ -1448,7 +1476,7 @@ export default function App() {
                     setActualId(p.id);
                   }}
                 >
-                  <Caratula blob={p.caratula} className="mini" />
+                  <Caratula blob={p.caratula} className={`mini${p.favorito ? " favorita" : ""}`} />
                   <span className="info">
                     <span className="titulo">{p.titulo}</span>
                     <span className="artista">{p.artista}</span>
