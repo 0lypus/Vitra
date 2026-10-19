@@ -66,7 +66,14 @@ Los borrados no se eliminan: quedan como **tumbas** (`borrado: true`) con su pro
 
 ### Base de datos
 
-`vitra.db` (SQLite, al lado del proyecto) se crea y se actualiza sola al arrancar con las migraciones de EF Core; no hace falta tocar nada a mano. Para cambiar el esquema, editá `Modelos.cs` y generá una migración nueva:
+`vitra.db` (SQLite, al lado del proyecto) se crea y se actualiza sola al arrancar con las migraciones de EF Core; no hace falta tocar nada a mano. Con `Vitra:Base` (en `appsettings.json`, con `--Vitra:Base=...` al arrancar o con la variable `VITRA_BASE`) podés apuntar a otro archivo: sirve para probar con una base **descartable** sin tocar la de siempre. Una ruta relativa se resuelve contra el directorio del proyecto:
+
+```powershell
+cd backend/Vitra.Api
+dotnet run -- --Vitra:Base=$env:TEMP\vitra-prueba.db
+```
+
+Para cambiar el esquema, editá `Modelos.cs` y generá una migración nueva:
 
 ```powershell
 cd backend/Vitra.Api
@@ -88,7 +95,7 @@ cd backend/Vitra.Api.Tests
 dotnet test
 ```
 
-Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético), los orígenes permitidos por el CORS y la clave de acceso.
+Cubren las marcas `actualizado` (formato, zona horaria y orden alfabético), los orígenes permitidos por el CORS, la clave de acceso y la ruta de la base de datos.
 
 ## Pendientes
 

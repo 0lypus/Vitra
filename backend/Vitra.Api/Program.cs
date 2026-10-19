@@ -20,8 +20,16 @@ var builder = WebApplication.CreateBuilder(args);
 var claveApi = (builder.Configuration["Vitra:Clave"] ?? "").Trim();
 if (claveApi.Length == 0) claveApi = (Environment.GetEnvironmentVariable("VITRA_CLAVE") ?? "").Trim();
 
+/* Base de datos SQLite: por defecto vitra.db al lado del proyecto. "Vitra:Base"
+   (o la variable VITRA_BASE) permite apuntar a otro archivo, por ejemplo para
+   probar con una base descartable sin tocar la de siempre. */
+var rutaBase = BaseDeDatos.Ruta(
+    builder.Configuration["Vitra:Base"],
+    Environment.GetEnvironmentVariable("VITRA_BASE"),
+    builder.Environment.ContentRootPath);
+
 builder.Services.AddDbContext<VitraContext>(opciones =>
-    opciones.UseSqlite($"Data Source={builder.Environment.ContentRootPath}/vitra.db"));
+    opciones.UseSqlite($"Data Source={rutaBase}"));
 
 /* CORS: la app corre en localhost y, desde el celular, en la IP de la red, así
    que se aceptan los orígenes de la red local. Con "Vitra:Origenes" (separados
@@ -37,6 +45,8 @@ builder.Services.AddCors(opciones =>
         .AllowAnyMethod()));
 
 var app = builder.Build();
+
+app.Logger.LogInformation("Vitra API: base de datos en {Ruta}.", rutaBase);
 
 /* Aplica las migraciones al arrancar: la base es descartable (se regenera con
    un sync), así que no hace falta que la toques a mano. Si venís de una versión

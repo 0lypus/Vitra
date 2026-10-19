@@ -64,7 +64,7 @@ El backend tiene sus propios tests (xunit):
 
 ```powershell
 cd backend/Vitra.Api.Tests
-dotnet test     # 43 tests (marcas de sincronización, clave de acceso y orígenes permitidos)
+dotnet test     # 51 tests (marcas de sincronización, clave de acceso, orígenes permitidos y ruta de la base)
 ```
 
 Stack: React + TypeScript + Vite, `idb` (IndexedDB), `music-metadata` y `vite-plugin-pwa`. Sin frameworks de UI: CSS a mano con variables y `backdrop-filter`. Los tests usan `vitest` y, para los que tocan IndexedDB, `fake-indexeddb` (solo dependencia de desarrollo).
@@ -85,6 +85,7 @@ frontend/src/
 frontend/public/demo/  # canción de ejemplo CC0 y su letra
 backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
   Clave.cs             # clave de acceso opcional (encabezado X-Clave)
+  BaseDeDatos.cs       # dónde vive el SQLite (por defecto vitra.db, configurable)
   Modelos.cs           # entidades y marcas de sincronización
   Migrations/          # esquema de la base (EF Core, se aplica al arrancar)
 backend/Vitra.Api.Tests/  # tests de .NET (xunit)
