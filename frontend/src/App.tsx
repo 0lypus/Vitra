@@ -23,6 +23,7 @@ import { archivosDeEjemplo } from "./demos";
 import { parsearLrc, type LineaLetra } from "./letras";
 import { altoBarra, barrasLogaritmicas, valorBarra } from "./visualizador";
 import { aplicarRespaldo, crearRespaldo, leerRespaldo, nombreArchivoRespaldo } from "./respaldo";
+import { haySesion, ponerAccion, ponerEstado, ponerMetadatos, ponerPosicion, type ImagenSesion } from "./sesion";
 import { ErrorHttp, servidorSugerido, sincronizar } from "./sinc";
 import { formato, formatoTamano, normalizar } from "./utilidades";
 
@@ -440,27 +441,73 @@ export default function App() {
     }
   }, [aleatorio, repetir, verVisualizador]);
 
-  // Media Session API: controles en bloqueo, notificaciones y teclas multimedia
+  /* Controles de la Media Session: se enganchan una sola vez y leen el estado
+     actual por ref. En Android cada enganche deja una llamada nativa viva, así
+     que no conviene rehacerlos en cada tick del tiempo. */
+  const controlesRef = useRef({
+    play: () => {},
+    pause: () => {},
+    anterior: () => {},
+    siguiente: () => {},
+    buscar: (_segundo: number) => {},
+  });
+
   useEffect(() => {
-    if (!("mediaSession" in navigator) || !pista) return;
+    controlesRef.current = {
+      play: () => {
+        const a = audioRef.current;
+        if (a) a.play().catch(() => {});
+      },
+      pause: () => {
+        const a = audioRef.current;
+        if (a) a.pause();
+      },
+      anterior,
+      siguiente: () => siguiente(),
+      buscar: (segundo) => {
+        const a = audioRef.current;
+        if (a && Number.isFinite(segundo)) a.currentTime = segundo;
+      },
+    };
+  });
+
+  useEffect(() => {
+    if (!haySesion()) return;
+    ponerAccion("play", () => controlesRef.current.play());
+    ponerAccion("pause", () => controlesRef.current.pause());
+    ponerAccion("previoustrack", () => controlesRef.current.anterior());
+    ponerAccion("nexttrack", () => controlesRef.current.siguiente());
+    ponerAccion("seekto", (detalles) => {
+      const segundo = detalles.seekTime;
+      if (segundo !== undefined && segundo !== null) controlesRef.current.buscar(segundo);
+    });
+
+    return () => {
+      ponerAccion("play", null);
+      ponerAccion("pause", null);
+      ponerAccion("previoustrack", null);
+      ponerAccion("nexttrack", null);
+      ponerAccion("seekto", null);
+    };
+  }, []);
+
+  // Media Session: metadatos en bloqueo, notificaciones y teclas multimedia
+  useEffect(() => {
+    if (!haySesion() || !pista) return;
     let artworkUrl: string | undefined;
 
-    const artwork: MediaImage[] = [];
+    const artwork: ImagenSesion[] = [];
     if (pista.caratula) {
       artworkUrl = URL.createObjectURL(pista.caratula);
       artwork.push({ src: artworkUrl, sizes: "512x512", type: pista.caratula.type || "image/png" });
     }
 
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: pista.titulo,
-        artist: pista.artista,
-        album: pista.album || "",
-        artwork,
-      });
-    } catch {
-      /* algunos navegadores pueden fallar */
-    }
+    ponerMetadatos({
+      title: pista.titulo,
+      artist: pista.artista,
+      album: pista.album || "",
+      artwork,
+    });
 
     return () => {
       if (artworkUrl) {
@@ -469,49 +516,17 @@ export default function App() {
     };
   }, [pista]);
 
+  // Estado de reproducción: en Android esto levanta (y corta) el servicio de
+  // primer plano que mantiene el audio sonando con la pantalla apagada
   useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
-    const ms = navigator.mediaSession;
-    ms.playbackState = sonando ? "playing" : "paused";
+    if (!haySesion()) return;
+    ponerEstado(!pista ? "none" : sonando ? "playing" : "paused");
+  }, [sonando, pista]);
 
-    const playHandler = () => {
-      const a = audioRef.current;
-      if (a) a.play().catch(() => {});
-    };
-    const pauseHandler = () => {
-      const a = audioRef.current;
-      if (a) a.pause();
-    };
-
-    ms.setActionHandler("play", playHandler);
-    ms.setActionHandler("pause", pauseHandler);
-    ms.setActionHandler("previoustrack", anterior);
-    ms.setActionHandler("nexttrack", () => siguiente());
-    ms.setActionHandler("seekto", (e: MediaSessionActionDetails) => {
-      const a = audioRef.current;
-      if (a && e.seekTime !== undefined && !Number.isNaN(e.seekTime)) {
-        a.currentTime = e.seekTime;
-      }
-    });
-
-    try {
-      ms.setPositionState?.({
-        duration: duracion || 0,
-        playbackRate: 1,
-        position: tiempo,
-      });
-    } catch {
-      /* algunos navegadores no soportan esto */
-    }
-
-    return () => {
-      ms.setActionHandler("play", null);
-      ms.setActionHandler("pause", null);
-      ms.setActionHandler("previoustrack", null);
-      ms.setActionHandler("nexttrack", null);
-      ms.setActionHandler("seekto", null);
-    };
-  }, [sonando, duracion, tiempo, pista, aleatorio, repetir]);
+  useEffect(() => {
+    if (!haySesion()) return;
+    ponerPosicion(duracion || 0, tiempo);
+  }, [duracion, tiempo]);
 
   /* Importa archivos de audio y letras .lrc (del input, de la demo o soltados en la ventana) */
   async function importarArchivos(entradas: File[]) {
