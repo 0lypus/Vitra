@@ -29,7 +29,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Media Session**: controles en la pantalla de bloqueo, notificaciones y teclas multimedia con carátula.
 - **PWA instalable**: funciona offline (service worker con Workbox) e incluye canciones de ejemplo.
 - **Respeta tu batería y tu espacio**: pide almacenamiento persistente y muestra cuánto ocupás.
-- **Liviano**: el heap de JavaScript de la app ronda los **2–3 MB** (medido; ver [Rendimiento](#rendimiento)).
+- **Liviano**: el heap de JavaScript de la app ronda los **2–4 MB** (medido; ver [Rendimiento](#rendimiento)).
 
 ## Uso
 
@@ -51,6 +51,13 @@ npm run dev:red  # igual, pero escuchando en la red (para el celular)
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
 npm test         # tests (parser .lrc, utilidades, cola, visualizador, ejemplos, sync y borrados, respaldo y clave)
+```
+
+Hay además dos pruebas que manejan el navegador de verdad (Chrome headless y el DevTools Protocol); las dos necesitan el build servido con `npm run preview` en otra terminal:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File docs/prueba-ui.ps1   # prueba de humo: 15 flujos de la interfaz
+powershell -ExecutionPolicy Bypass -File docs/medir-ram.ps1   # mide la RAM de la app
 ```
 
 El backend tiene sus propios tests (xunit):
@@ -83,6 +90,7 @@ backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
 backend/Vitra.Api.Tests/  # tests de .NET (xunit)
 docs/logo.png
 docs/medir-ram.ps1      # mide la RAM de la app (Chrome headless)
+docs/prueba-ui.ps1      # prueba de humo de la interfaz (15 flujos)
 ```
 
 ## Rendimiento
@@ -91,11 +99,11 @@ Medido con `docs/medir-ram.ps1` (Chrome headless, perfil limpio, sirviendo el bu
 
 | Momento | Heap de JS de la app | Navegador entero |
 | --- | --- | --- |
-| Pestaña vacía (referencia) | 0,4 MB | ~473 MB |
-| Vitra cargada, sin canciones | 2,2 MB | ~654 MB |
-| Con una canción importada | 3,1 MB | ~675 MB |
+| Pestaña vacía (referencia) | 0,4 MB | ~470 MB |
+| Vitra cargada, sin canciones | 2,2 MB | ~650 MB |
+| Con las tres canciones de ejemplo (14 MB de audio) | 3,6 MB | ~680 MB |
 
-La app en sí ocupa **2–3 MB**. Lo que pese el resto es del navegador: cada pestaña arranca su propio proceso (*renderer*) y eso ya son cientos de MB antes de cargar nada. En uso real el heap se mantiene bajo porque:
+La app en sí ocupa **2–4 MB**. El audio no está en memoria: vive en IndexedDB y el `<audio>` lo lee desde un blob. Lo que pese el resto es del navegador: cada pestaña arranca su propio proceso (*renderer*) y eso ya son cientos de MB antes de cargar nada. El heap se mantiene bajo porque:
 
 - las carátulas se reducen a 256 px y sus `objectURL` se liberan al cambiar de vista (`URL.revokeObjectURL`);
 - la lista está **virtualizada**: solo se pintan las filas visibles;
@@ -145,6 +153,7 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 - [x] Carátula destacada en las favoritas
 - [x] Edición de metadatos y renombrado de listas
 - [x] Tests unitarios (parser `.lrc`, utilidades, cola, ejemplos, sincronización y respaldo)
+- [x] Prueba de humo de la interfaz en Chrome headless (15 flujos, `docs/prueba-ui.ps1`)
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
 - [x] Propagar borrados al sincronizar (tumbas con su propia marca, que compiten igual que las ediciones)
 - [x] Autenticación con clave para el backend (opcional, cabezal `X-Clave`); con `Vitra:Clave` vacío queda abierto para red local.
