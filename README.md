@@ -49,6 +49,7 @@ npm install
 npm run dev      # desarrollo con hot reload
 npm run dev:red  # igual, pero escuchando en la red (para el celular)
 npm run build    # build de producción con service worker
+npm run build:app # build para empaquetar como app (sin service worker, a dist-app)
 npm run preview  # sirve el build para probarlo
 npm test         # tests (parser .lrc, utilidades, cola, visualizador, ejemplos, metadatos, sync y borrados, respaldo y clave)
 ```
@@ -89,10 +90,50 @@ backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
   Modelos.cs           # entidades y marcas de sincronización
   Migrations/          # esquema de la base (EF Core, se aplica al arrancar)
 backend/Vitra.Api.Tests/  # tests de .NET (xunit)
+escritorio/Vitra.Escritorio/  # app de escritorio (WPF + WebView2)
+frontend/android/             # proyecto Android (Capacitor)
 docs/logo.png
 docs/medir-ram.ps1      # mide la RAM de la app (Chrome headless)
 docs/prueba-ui.ps1      # prueba de la interfaz (28 comprobaciones, Chrome headless)
 ```
+
+## Apps de escritorio y Android
+
+Vitra también se puede empaquetar como aplicación sin reescribir nada: es la misma app web adentro de una ventana (escritorio) o de un WebView (Android). Primero va el build pensado para empaquetar, que no lleva service worker (los archivos viajan dentro del paquete, así que no hace falta):
+
+```powershell
+cd frontend
+npm run build:app   # genera dist-app
+```
+
+### Escritorio (`.exe`)
+
+El proyecto está en `escritorio/Vitra.Escritorio` (WPF + **WebView2**, el motor que ya trae Windows 11). No hace falta instalar nada más. El perfil, con tu biblioteca, queda en `%LOCALAPPDATA%\Vitra\WebView2` (aparte del que usa el navegador).
+
+```powershell
+cd escritorio/Vitra.Escritorio
+dotnet publish -c Release
+```
+
+Queda `Vitra.exe` (≈ 1,4 MB) y, al lado, la carpeta `web/` con la app (por eso se entrega como carpeta o `.zip`, no el `.exe` solo). Necesita el **.NET Desktop Runtime 10** (ya lo tenés con el SDK); si querés un `.exe` que corra en cualquier Windows sin instalar nada, agregá `--self-contained true` (pesa bastante más).
+
+### Android (`.apk`)
+
+El proyecto está en `frontend/android` (**Capacitor**). Para compilarlo hace falta **JDK 21** y el **Android SDK** (lo más simple es instalar [Android Studio](https://developer.android.com/studio), que trae los dos). Una vez instalado, con el celular conectado por USB o sin él:
+
+```powershell
+cd frontend
+npm run build:app
+npx cap sync android
+cd android
+.\gradlew assembleDebug
+```
+
+El APK queda en `android\app\build\outputs\apk\debug\app-debug.apk` y se instala con `adb install -r app\build\outputs\apk\debug\app-debug.apk`. Ese es un APK **de prueba** (firma de depuración): sirve para tu teléfono, pero para repartirlo a otras personas hay que firmarlo con una clave propia (`assembleRelease` + keystore).
+
+El ícono hoy es el genérico de Capacitor; se puede reemplazar por el de Vitra con `npx @capacitor/assets generate` a partir de un PNG.
+
+**A probar en el teléfono:** el audio en segundo plano. El APK reproduce con la app abierta, pero todavía **no** tiene un servicio de primer plano, así que Android podría cortar el audio al mandarla al fondo o apagar la pantalla. Es lo primero que conviene verificar en el dispositivo real.
 
 ## Rendimiento
 
@@ -148,6 +189,18 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 - `demo2.mp3`: “Nocturne Op. 9 no. 1 in B flat” de **Frédéric Chopin**, grabación de Wikimedia Commons.
 - `demo3.mp3`: “EG 508 Wir pflügen und wir streuen” de **Wolfgang Kindl**, de Wikimedia Commons.
 
+## Estado del proyecto
+
+Vitra está **completa y en uso**: no le falta nada del plan original.
+
+- **Funciona entera sin backend.** El servidor de sincronización (`backend/Vitra.Api`) es opcional: solo hace falta si querés la misma biblioteca en varios dispositivos.
+- **Tests:** 101 del frontend (Vitest) y 51 del backend (xunit), todos en verde. El build y el lint no tiran errores.
+- **Sin cuentas, sin servidores de terceros, sin rastreo:** la biblioteca vive en tu equipo (IndexedDB).
+- **Licencia:** el código es **MIT** (ver [Licencia](#licencia)); las canciones de ejemplo son CC0.
+- **Se corre desde el repo** (todavía sin releases publicadas).
+
+Lo hecho, en detalle, está en el [Roadmap](#roadmap). Lo que falta es **distribuirla como aplicación**: de escritorio (`.exe`) y de Android (`.apk`), en vez de abrirla en el navegador.
+
 ## Roadmap
 
 - [x] Cola de reproducción manual (a continuación / al final, con panel para reordenar)
@@ -162,6 +215,8 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 - [x] Exportar e importar la biblioteca en JSON
 - [x] Medir y documentar el consumo de RAM (`docs/medir-ram.ps1`)
 - [x] Tres canciones de ejemplo CC0 (Kevin MacLeod, Chopin y un himno de Wikimedia)
+- [ ] Empaquetar como aplicación de escritorio (`.exe`)
+- [ ] Empaquetar como aplicación de Android (`.apk`)
 
 ## Licencia
 
