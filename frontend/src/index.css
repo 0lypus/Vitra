@@ -360,6 +360,12 @@ body {
   border-radius: 999px;
   cursor: pointer;
   transition: color 0.2s, background 0.2s, border-color 0.2s;
+  /* Un nombre de lista largo (puede llegar de un respaldo o del sync) no
+     desborda el chip: se recorta con puntos suspensivos */
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chip:hover {
