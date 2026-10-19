@@ -2,10 +2,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     VitePWA({
+      // En el build para las apps (escritorio y Android con "npm run build:app")
+      // el service worker no hace falta: los archivos van dentro del paquete.
+      disable: mode === "app",
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png"],
       manifest: {
@@ -24,4 +27,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+}));

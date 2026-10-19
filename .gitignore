@@ -153,3 +153,6 @@ bin
 obj
 *.user
 backend/**/vitra.db*
+
+# Empaquetado como app (escritorio y Android): se regenera con npm run build:app
+frontend/dist-app

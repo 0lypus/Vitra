@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    App de escritorio de Vitra: envuelve el build web (frontend/dist-app) en una
+    ventana con WebView2. No reimplementa nada del reproductor: carga la misma
+    app que corre en el navegador.
+
+    Para armarla:
+      cd frontend; npm run build:app
+      cd ../escritorio/Vitra.Escritorio; dotnet publish -c Release
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Vitra</AssemblyName>
+    <RootNamespace>Vitra.Escritorio</RootNamespace>
+    <ApplicationIcon>..\..\frontend\public\favicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- La app web se copia al lado del ejecutable, en la carpeta "web" -->
+  <ItemGroup>
+    <Content Include="..\..\frontend\dist-app\**\*" Link="web\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+  </ItemGroup>
+
+</Project>
