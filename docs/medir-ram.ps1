@@ -1,4 +1,4 @@
-# Mide la RAM de Vitra con Chrome headless y el DevTools Protocol.
+﻿# Mide la RAM de Vitra con Chrome headless y el DevTools Protocol.
 #
 # Da dos números:
 #   - heap de JavaScript de la app (lo que ocupa realmente Vitra)
