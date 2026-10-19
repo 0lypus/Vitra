@@ -29,6 +29,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Media Session**: controles en la pantalla de bloqueo, notificaciones y teclas multimedia con carátula.
 - **PWA instalable**: funciona offline (service worker con Workbox) e incluye canciones de ejemplo.
 - **Respeta tu batería y tu espacio**: pide almacenamiento persistente y muestra cuánto ocupás.
+- **Liviano**: el heap de JavaScript de la app ronda los **2–3 MB** (medido; ver [Rendimiento](#rendimiento)).
 
 ## Uso
 
@@ -81,7 +82,29 @@ backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
   Migrations/          # esquema de la base (EF Core, se aplica al arrancar)
 backend/Vitra.Api.Tests/  # tests de .NET (xunit)
 docs/logo.png
+docs/medir-ram.ps1      # mide la RAM de la app (Chrome headless)
 ```
+
+## Rendimiento
+
+Medido con `docs/medir-ram.ps1` (Chrome headless, perfil limpio, sirviendo el build con `npm run preview`):
+
+| Momento | Heap de JS de la app | Navegador entero |
+| --- | --- | --- |
+| Pestaña vacía (referencia) | 0,4 MB | ~473 MB |
+| Vitra cargada, sin canciones | 2,2 MB | ~654 MB |
+| Con una canción importada | 3,1 MB | ~675 MB |
+
+La app en sí ocupa **2–3 MB**. Lo que pese el resto es del navegador: cada pestaña arranca su propio proceso (*renderer*) y eso ya son cientos de MB antes de cargar nada. En uso real el heap se mantiene bajo porque:
+
+- las carátulas se reducen a 256 px y sus `objectURL` se liberan al cambiar de vista (`URL.revokeObjectURL`);
+- la lista está **virtualizada**: solo se pintan las filas visibles;
+- el audio no se copia a `ArrayBuffer`: vive en IndexedDB y el `<audio>` lo lee desde un blob;
+- el visualizador usa Web Audio API con `requestAnimationFrame` a 30 fps, sin re-render de React.
+
+El bundle de producción son ~275 KB de JavaScript (85 KB comprimido) más 10 KB de CSS.
+
+Para repetir la medición: `cd frontend; npm run build; npm run preview` y, en otra terminal, `powershell -ExecutionPolicy Bypass -File docs/medir-ram.ps1`.
 
 El backend es opcional: Vitra funciona entero sin él. Para levantarlo:
 
@@ -115,7 +138,7 @@ Detalles de los endpoints en `backend/README.md`.
 ## Roadmap
 
 - [x] Cola de reproducción manual (a continuación / al final, con panel para reordenar)
-- [ ] Carátula destacada en las favoritas
+- [x] Carátula destacada en las favoritas
 - [x] Edición de metadatos y renombrado de listas
 - [x] Tests unitarios (parser `.lrc`, utilidades, cola, sincronización y respaldo)
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
@@ -123,6 +146,8 @@ Detalles de los endpoints en `backend/README.md`.
 - [x] Autenticación con clave para el backend (opcional, cabezal `X-Clave`); con `Vitra:Clave` vacío queda abierto para red local.
 - [x] Migraciones de EF Core en vez de `EnsureCreated` (la base se pone al día sola al arrancar)
 - [x] Exportar e importar la biblioteca en JSON
+- [x] Medir y documentar el consumo de RAM (`docs/medir-ram.ps1`)
+- [ ] Más canciones de ejemplo CC0 (hoy hay una sola)
 
 ## Licencia
 
