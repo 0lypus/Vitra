@@ -50,7 +50,7 @@ npm run dev      # desarrollo con hot reload
 npm run dev:red  # igual, pero escuchando en la red (para el celular)
 npm run build    # build de producción con service worker
 npm run preview  # sirve el build para probarlo
-npm test         # tests (parser .lrc, utilidades, cola, visualizador, ejemplos, sync y borrados, respaldo y clave)
+npm test         # tests (parser .lrc, utilidades, cola, visualizador, ejemplos, metadatos, sync y borrados, respaldo y clave)
 ```
 
 Hay además dos pruebas que manejan el navegador de verdad (Chrome headless y el DevTools Protocol); las dos necesitan el build servido con `npm run preview` en otra terminal:
@@ -152,7 +152,7 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 - [x] Cola de reproducción manual (a continuación / al final, con panel para reordenar)
 - [x] Carátula destacada en las favoritas
 - [x] Edición de metadatos y renombrado de listas
-- [x] Tests unitarios (parser `.lrc`, utilidades, cola, ejemplos, sincronización y respaldo)
+- [x] Tests unitarios (parser `.lrc`, utilidades, cola, ejemplos, metadatos, sincronización y respaldo)
 - [x] Prueba de la interfaz en Chrome headless (28 comprobaciones: flujos y casos raros, `docs/prueba-ui.ps1`)
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
 - [x] Propagar borrados al sincronizar (tumbas con su propia marca, que compiten igual que las ediciones)
