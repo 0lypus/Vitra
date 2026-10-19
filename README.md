@@ -26,7 +26,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 - **Biblioteca virtualizada**: la lista solo pinta las filas visibles, así que cientos de canciones no la traban.
 - **Atajos de teclado**: `Espacio` play/pausa · `←`/`→` ±5 s · `Shift+←`/`Shift+→` pista anterior/siguiente · `↑`/`↓` volumen · `S` aleatorio · `R` repetir.
 - **Arrastrar y soltar**: soltá archivos de audio o `.lrc` sobre la ventana para importarlos.
-- **Media Session**: controles en la pantalla de bloqueo, notificaciones y teclas multimedia con carátula.
+- **Media Session**: controles en la pantalla de bloqueo, notificaciones y teclas multimedia con carátula. En Android suma un servicio de primer plano, así la música sigue con la pantalla apagada.
 - **PWA instalable**: funciona offline (service worker con Workbox) e incluye canciones de ejemplo.
 - **Respeta tu batería y tu espacio**: pide almacenamiento persistente y muestra cuánto ocupás.
 - **Liviano**: el heap de JavaScript de la app ronda los **2–4 MB** (medido; ver [Rendimiento](#rendimiento)).
@@ -79,6 +79,7 @@ frontend/src/
   cola.ts        # cola de reproducción (lógica pura)
   letras.ts      # parser y serializador de letras .lrc
   respaldo.ts    # respaldo de la biblioteca en JSON
+  sesion.ts      # puente de la Media Session (navegador y app de Android)
   sinc.ts        # cliente del backend (subir y bajar cambios y borrados)
   utilidades.ts  # formato de tiempo, tamaños y normalización de texto
   visualizador.ts # reparto logarítmico del espectro en barras
@@ -93,6 +94,7 @@ backend/Vitra.Api.Tests/  # tests de .NET (xunit)
 escritorio/Vitra.Escritorio/  # app de escritorio (WPF + WebView2)
 frontend/android/             # proyecto Android (Capacitor)
 docs/logo.png
+docs/iconos-android.ps1 # genera el ícono y la pantalla de inicio del APK
 docs/medir-ram.ps1      # mide la RAM de la app (Chrome headless)
 docs/prueba-ui.ps1      # prueba de la interfaz (28 comprobaciones, Chrome headless)
 ```
@@ -112,10 +114,10 @@ El proyecto está en `escritorio/Vitra.Escritorio` (WPF + **WebView2**, el motor
 
 ```powershell
 cd escritorio/Vitra.Escritorio
-dotnet publish -c Release
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
 ```
 
-Queda `Vitra.exe` (≈ 1,4 MB) y, al lado, la carpeta `web/` con la app (por eso se entrega como carpeta o `.zip`, no el `.exe` solo). Necesita el **.NET Desktop Runtime 10** (ya lo tenés con el SDK); si querés un `.exe` que corra en cualquier Windows sin instalar nada, agregá `--self-contained true` (pesa bastante más).
+Queda en `bin\Release\net10.0-windows\win-x64\publish`: `Vitra.exe` (≈ 1,4 MB) y, al lado, la carpeta `web/` con la app (por eso se entrega como carpeta o `.zip`, no el `.exe` solo). Necesita el **.NET Desktop Runtime 10** (ya lo tenés con el SDK); si querés un `.exe` que corra en cualquier Windows sin instalar nada, cambiá `--self-contained false` por `true` (pesa bastante más).
 
 ### Android (`.apk`)
 
@@ -143,9 +145,9 @@ Queda en `android\app\build\outputs\apk\debug\app-debug.apk`. Con el celular con
 
 Ese es un APK **de prueba** (firma de depuración): sirve para tu teléfono, pero para repartirlo a otras personas hay que firmarlo con una clave propia (`assembleRelease` + keystore).
 
-El ícono hoy es el genérico de Capacitor; se puede reemplazar por el de Vitra con `npx @capacitor/assets generate` a partir de un PNG.
+El ícono y la pantalla de inicio son los de Vitra: se generan desde `frontend/public/pwa-512x512.png` con `docs/iconos-android.ps1` (usa `System.Drawing`, así que no suma dependencias).
 
-**A probar en el teléfono:** el audio en segundo plano. El APK reproduce con la app abierta, pero todavía **no** tiene un servicio de primer plano, así que Android podría cortar el audio al mandarla al fondo o apagar la pantalla. Es lo primero que conviene verificar en el dispositivo real.
+**Audio en segundo plano:** el APK engancha la Media Session de Android con `@capgo/capacitor-media-session`, que levanta un servicio de primer plano de tipo `mediaPlayback` mientras hay una pista cargada. Por eso la música sigue con la pantalla apagada o la app en segundo plano, y los controles quedan en la notificación. **Falta confirmarlo en un teléfono real** (no se pudo probar desde acá).
 
 ## Rendimiento
 
@@ -206,7 +208,7 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 Vitra está **completa y en uso**: no le falta nada del plan original.
 
 - **Funciona entera sin backend.** El servidor de sincronización (`backend/Vitra.Api`) es opcional: solo hace falta si querés la misma biblioteca en varios dispositivos.
-- **Tests:** 101 del frontend (Vitest) y 51 del backend (xunit), todos en verde. El build y el lint no tiran errores.
+- **Tests:** 104 del frontend (Vitest) y 51 del backend (xunit), todos en verde. El build y el lint no tiran errores.
 - **Sin cuentas, sin servidores de terceros, sin rastreo:** la biblioteca vive en tu equipo (IndexedDB).
 - **Licencia:** el código es **MIT** (ver [Licencia](#licencia)); las canciones de ejemplo son CC0.
 - **Descargable:** hay un [Release](https://github.com/0lypus/Vitra/releases) con la app de PC (`.exe`) y la de Android (`.apk`), además de correrse desde el repo.
@@ -229,6 +231,8 @@ Lo hecho, en detalle, está en el [Roadmap](#roadmap). También se empaqueta com
 - [x] Tres canciones de ejemplo CC0 (Kevin MacLeod, Chopin y un himno de Wikimedia)
 - [x] Empaquetar como aplicación de escritorio (`.exe`)
 - [x] Empaquetar como aplicación de Android (`.apk`)
+- [x] Ícono y pantalla de inicio propios en el APK (ya no los genéricos de Capacitor)
+- [x] Audio en segundo plano en Android (servicio de primer plano de la Media Session)
 
 ## Licencia
 
