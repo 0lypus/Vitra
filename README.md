@@ -12,7 +12,7 @@ Vitra es una Progressive Web App que reproduce la música que ya tenés en tu di
 
 ## Características
 
-- **Biblioteca local**: importá MP3, M4A, AAC, OGG, OPUS, WAV, FLAC, WEBM y MP4. Los archivos se guardan en IndexedDB junto con sus metadatos y carátulas (comprimidas a 256 px).
+- **Biblioteca local**: importá MP3, M4A, AAC, OGG, OPUS, WAV, FLAC, WEBM y MP4. Los archivos se guardan en IndexedDB junto con sus metadatos y carátulas (comprimidas a 256 px). Si un archivo no se puede leer como audio (está dañado o no lo es), te avisa y no lo suma.
 - **Fondo dinámico**: el color dominante de la carátula tiñe el fondo con una transición suave.
 - **Letras sincronizadas (.lrc)**: parser propio; resalta la línea actual, se auto-centra y podés saltar haciendo clic en cualquier línea.
 - **Favoritos y listas de reproducción**: corazón en cada canción, chips de filtro y listas propias (crear, renombrar, eliminar, agregar o quitar canciones y reordenarlas con ↑/↓).
@@ -56,7 +56,7 @@ npm test         # tests (parser .lrc, utilidades, cola, visualizador, ejemplos,
 Hay además dos pruebas que manejan el navegador de verdad (Chrome headless y el DevTools Protocol); las dos necesitan el build servido con `npm run preview` en otra terminal:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File docs/prueba-ui.ps1   # prueba de humo: 15 flujos de la interfaz
+powershell -ExecutionPolicy Bypass -File docs/prueba-ui.ps1   # prueba de la interfaz: 28 comprobaciones (flujos y casos raros)
 powershell -ExecutionPolicy Bypass -File docs/medir-ram.ps1   # mide la RAM de la app
 ```
 
@@ -90,7 +90,7 @@ backend/Vitra.Api/     # API opcional de sincronización (ASP.NET Core + SQLite)
 backend/Vitra.Api.Tests/  # tests de .NET (xunit)
 docs/logo.png
 docs/medir-ram.ps1      # mide la RAM de la app (Chrome headless)
-docs/prueba-ui.ps1      # prueba de humo de la interfaz (15 flujos)
+docs/prueba-ui.ps1      # prueba de la interfaz (28 comprobaciones, Chrome headless)
 ```
 
 ## Rendimiento
@@ -153,7 +153,7 @@ El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio pú
 - [x] Carátula destacada en las favoritas
 - [x] Edición de metadatos y renombrado de listas
 - [x] Tests unitarios (parser `.lrc`, utilidades, cola, ejemplos, sincronización y respaldo)
-- [x] Prueba de humo de la interfaz en Chrome headless (15 flujos, `docs/prueba-ui.ps1`)
+- [x] Prueba de la interfaz en Chrome headless (28 comprobaciones: flujos y casos raros, `docs/prueba-ui.ps1`)
 - [x] Backend opcional con ASP.NET Core para sincronizar bibliotecas (v2)
 - [x] Propagar borrados al sincronizar (tumbas con su propia marca, que compiten igual que las ediciones)
 - [x] Autenticación con clave para el backend (opcional, cabezal `X-Clave`); con `Vitra:Clave` vacío queda abierto para red local.
