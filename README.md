@@ -133,7 +133,11 @@ Detalles de los endpoints en `backend/README.md`.
 
 ## Canciones de ejemplo
 
-`frontend/public/demo/demo1.mp3` es “Ancient Power Of Serpents” de **Kevin MacLeod** ([incompetech.com](https://incompetech.com)), licencia **CC0 1.0** (dominio público). Su `.lrc` incluido es solo una guía de tiempos para probar la sincronización. Ver `frontend/public/demo/README.md`.
+El botón “Cargar canciones de ejemplo” trae tres temas **CC0** (dominio público), todos con su atribución en `frontend/public/demo/README.md`:
+
+- `demo1.mp3`: “Ancient Power Of Serpents” de **Kevin MacLeod** ([incompetech.com](https://incompetech.com)). Su `.lrc` incluido es solo una guía de tiempos para probar la sincronización.
+- `demo2.mp3`: “Nocturne Op. 9 no. 1 in B flat” de **Frédéric Chopin**, grabación de Wikimedia Commons.
+- `demo3.mp3`: “EG 508 Wir pflügen und wir streuen” de **Wolfgang Kindl**, de Wikimedia Commons.
 
 ## Roadmap
 
@@ -147,7 +151,7 @@ Detalles de los endpoints en `backend/README.md`.
 - [x] Migraciones de EF Core en vez de `EnsureCreated` (la base se pone al día sola al arrancar)
 - [x] Exportar e importar la biblioteca en JSON
 - [x] Medir y documentar el consumo de RAM (`docs/medir-ram.ps1`)
-- [ ] Más canciones de ejemplo CC0 (hoy hay una sola)
+- [x] Tres canciones de ejemplo CC0 (Kevin MacLeod, Chopin y un himno de Wikimedia)
 
 ## Licencia
 
